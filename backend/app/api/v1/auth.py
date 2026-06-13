@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, client_meta
 from app.core.config import get_settings
@@ -57,20 +56,33 @@ def _set_refresh_cookie(response: Response, raw: str) -> None:
 async def register(
     body: RegisterIn, db: SessionDep, _: None = Depends(auth_rate_limit)
 ) -> dict[str, str]:
-    user = User(
-        email=body.email,
-        password_hash=hash_password(body.password),
-        full_name=body.full_name,
-        preferred_language=body.preferred_language,
-        role=UserRole.citizen,
-    )
-    db.add(user)
-    try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        # Don't reveal that the email is taken — pretend success, send no code.
+    existing = (
+        await db.execute(select(User).where(User.email == body.email))
+    ).scalar_one_or_none()
+
+    if existing is not None and existing.email_verified_at is not None:
+        # Already a usable account. Stay enumeration-safe (identical response) and
+        # issue no code — the right action for the caller is to log in.
         return {"status": "verification_sent"}
+
+    if existing is not None:
+        # Registered but never verified → unclaimed account. Let the latest signup
+        # attempt win (update name/password) and re-issue a fresh code. This also
+        # makes "Resend code" work by simply calling register again.
+        existing.password_hash = hash_password(body.password)
+        existing.full_name = body.full_name
+        existing.preferred_language = body.preferred_language
+    else:
+        db.add(
+            User(
+                email=body.email,
+                password_hash=hash_password(body.password),
+                full_name=body.full_name,
+                preferred_language=body.preferred_language,
+                role=UserRole.citizen,
+            )
+        )
+    await db.commit()
 
     otp = await otp_service.issue_otp(body.email)
     await send_otp(body.email, otp)

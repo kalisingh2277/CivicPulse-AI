@@ -63,6 +63,27 @@ export default function SignupPage() {
     }
   }
 
+  async function onResend() {
+    setError(null);
+    setBusy(true);
+    try {
+      // Re-calling register re-issues a fresh code for an unverified email.
+      const resp = await api.post<RegisterResp>("/auth/register", {
+        full_name: fullName,
+        email,
+        password,
+      });
+      if (resp.dev_otp) {
+        setDevOtp(resp.dev_otp);
+        setOtp(resp.dev_otp);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not resend code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto mt-16 max-w-sm px-4">
       <h1 className="mb-2 text-2xl font-semibold">
@@ -159,6 +180,14 @@ export default function SignupPage() {
               {busy ? "Verifying…" : "Verify & continue"}
             </button>
           </form>
+          <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
+            <button onClick={onResend} disabled={busy} className="underline disabled:opacity-50">
+              Resend code
+            </button>
+            <Link href="/login" className="underline">
+              Already verified? Log in
+            </Link>
+          </div>
         </>
       )}
     </main>

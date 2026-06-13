@@ -88,6 +88,34 @@ async def test_login_unverified_is_forbidden() -> None:
         assert r.json()["detail"]["code"] == "email_unverified"
 
 
+async def test_reregister_unverified_reissues_code() -> None:
+    # An unverified email can sign up again (e.g. lost the code) — a fresh code is
+    # issued and the latest password wins, since the account is unclaimed.
+    email = f"resend+{uuid4().hex[:8]}@example.com"
+    async with _client() as client:
+        await client.post(
+            "/api/v1/auth/register",
+            json={"email": email, "password": "firstpass123", "full_name": "First"},
+        )
+        r2 = await client.post(
+            "/api/v1/auth/register",
+            json={"email": email, "password": "secondpass123", "full_name": "Second"},
+        )
+        new_otp = await redis_client.get(_key(email))
+        assert r2.json().get("dev_otp") == new_otp  # dev returns the fresh code
+
+        verify = await client.post(
+            "/api/v1/auth/verify-email", json={"email": email, "otp": new_otp}
+        )
+        assert verify.status_code == 200
+
+        # the second (latest) password is the one that works
+        ok = await client.post(
+            "/api/v1/auth/login", json={"email": email, "password": "secondpass123"}
+        )
+        assert ok.status_code == 200
+
+
 async def test_me_requires_auth() -> None:
     async with _client() as client:
         r = await client.get("/api/v1/auth/me")
