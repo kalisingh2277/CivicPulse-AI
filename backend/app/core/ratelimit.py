@@ -30,3 +30,18 @@ async def otp_rate_limit(request: Request) -> None:
     # Caps OTP guesses so the 6-digit code can't be brute-forced inside its
     # 10-minute window (10/min → at most ~100 tries vs a 1,000,000 space).
     await rate_limit(request, "otp", 10)
+
+
+async def enforce_daily_complaint_limit(user_id: str, limit: int = 10) -> None:
+    """Per-citizen daily cap on complaint creation (keyed by user, not IP)."""
+    key = f"rl:complaint:{user_id}"
+    count = await redis_client.incr(key)
+    if count == 1:
+        await redis_client.expire(key, 86400)
+    if count > limit:
+        ttl = await redis_client.ttl(key)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"code": "daily_limit_reached", "message": "Daily complaint limit reached"},
+            headers={"Retry-After": str(max(ttl, 1))},
+        )

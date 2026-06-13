@@ -1,57 +1,25 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-type Health = {
-  status: string;
-  db: boolean;
-  redis: boolean;
-  extensions: string[];
-};
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import Link from "next/link";
 
 export default function Home() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(`${API_URL}/api/v1/health`)
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch((e: unknown) => setError(String(e)));
-  }, []);
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-3xl font-semibold">CivicPulse AI</h1>
-      <p className="text-neutral-500">Day 1 — stack health</p>
-      {error && (
-        <p className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
-          API unreachable — is uvicorn running on :8000? ({error})
-        </p>
-      )}
-      {health && (
-        <div className="flex flex-wrap justify-center gap-3">
-          <Chip ok={health.db} label="PostgreSQL" />
-          <Chip ok={health.redis} label="Redis" />
-          <Chip ok={health.extensions.includes("postgis")} label="PostGIS" />
-          <Chip ok={health.extensions.includes("vector")} label="pgvector" />
-          <Chip ok={health.extensions.includes("citext")} label="citext" />
-        </div>
-      )}
+    <main className="mx-auto mt-20 max-w-2xl px-4 text-center">
+      <h1 className="text-4xl font-semibold">CivicPulse AI</h1>
+      <p className="mt-4 text-lg text-neutral-600">
+        Report a civic problem in seconds. We deduplicate, prioritize, and route it to the
+        right department — and you can track it to resolution.
+      </p>
+      <div className="mt-8 flex justify-center gap-4">
+        <Link href="/report" className="rounded-md bg-neutral-900 px-5 py-2.5 text-white">
+          Report a problem
+        </Link>
+        <Link
+          href="/my"
+          className="rounded-md border border-neutral-300 px-5 py-2.5 hover:bg-neutral-100"
+        >
+          Track my complaints
+        </Link>
+      </div>
+      <p className="mt-10 text-sm text-neutral-400">Pilot city: Bengaluru</p>
     </main>
-  );
-}
-
-function Chip({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span
-      className={`rounded-full px-4 py-1.5 text-sm font-medium ${
-        ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-      }`}
-    >
-      {label} {ok ? "✓" : "✗"}
-    </span>
   );
 }

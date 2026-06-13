@@ -16,10 +16,11 @@ Prereqs: Docker Desktop, Node 22 + pnpm, uv.
 # 1. infra (postgres+postgis+pgvector, redis, minio)
 docker compose up -d
 
-# 2. backend env + migrations + API
+# 2. backend env + migrations + seed + API
 Copy-Item .env.example backend\.env
 cd backend
 uv run alembic upgrade head
+uv run python -m scripts.seed          # departments, categories, 243 BBMP wards
 uv run uvicorn app.main:app --reload --port 8000
 
 # 3. frontend (new terminal)
