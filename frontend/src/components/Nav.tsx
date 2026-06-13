@@ -26,9 +26,17 @@ export function Nav() {
             </button>
           </>
         ) : (
-          <Link href="/login" className="rounded-md border px-3 py-1 hover:bg-neutral-100">
-            Login
-          </Link>
+          <>
+            <Link href="/login" className="hover:underline">
+              Login
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-md border px-3 py-1 hover:bg-neutral-100"
+            >
+              Sign up
+            </Link>
+          </>
         )}
       </div>
     </nav>

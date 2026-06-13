@@ -74,7 +74,12 @@ async def register(
 
     otp = await otp_service.issue_otp(body.email)
     await send_otp(body.email, otp)
-    return {"status": "verification_sent"}
+    resp = {"status": "verification_sent"}
+    # Dev-only convenience: surface the code so the signup UI can show it without
+    # digging through server logs. NEVER returned outside dev.
+    if settings.env == "dev":
+        resp["dev_otp"] = otp
+    return resp
 
 
 @router.post("/verify-email")
