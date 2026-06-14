@@ -56,9 +56,7 @@ def _set_refresh_cookie(response: Response, raw: str) -> None:
 async def register(
     body: RegisterIn, db: SessionDep, _: None = Depends(auth_rate_limit)
 ) -> dict[str, str]:
-    existing = (
-        await db.execute(select(User).where(User.email == body.email))
-    ).scalar_one_or_none()
+    existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
 
     if existing is not None and existing.email_verified_at is not None:
         # Already a usable account. Stay enumeration-safe (identical response) and

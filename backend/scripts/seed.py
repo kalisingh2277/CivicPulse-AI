@@ -6,13 +6,24 @@ Idempotent — safe to run repeatedly.
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select, text
 
 from app.core.db import session_factory
+from app.core.security import hash_password
+from app.models.enums import UserRole
 from app.models.org import Category, Department
+from app.models.user import User
 from app.services import wards as ward_service
+
+# Bootstrap staff accounts for local/demo use (all pre-verified). Dev passwords only.
+# NOTE: domain must pass email-validator — .local/.test are rejected as special-use.
+DEMO_PASSWORD = "civicpulse123"
+ADMIN_EMAIL = "admin@civicpulse.gov.in"
+# one official (department head) per department: official.<dept>@civicpulse.gov.in
+
 
 WARD_GEOJSON = Path(__file__).resolve().parent.parent / "data" / "bbmp_wards_raw.geojson"
 
@@ -95,12 +106,53 @@ async def seed_categories(session, dept_ids: dict[str, int]) -> int:
     return added
 
 
+async def seed_staff(session, dept_ids: dict[str, int]) -> int:
+    """One admin + one department-head official per department (pre-verified)."""
+    added = 0
+
+    async def ensure(email, name, role, dept_id=None, head=False) -> None:
+        nonlocal added
+        exists = (
+            await session.execute(select(User).where(User.email == email))
+        ).scalar_one_or_none()
+        if exists is not None:
+            return
+        session.add(
+            User(
+                email=email,
+                full_name=name,
+                role=role,
+                password_hash=hash_password(DEMO_PASSWORD),
+                department_id=dept_id,
+                is_department_head=head,
+                email_verified_at=datetime.now(UTC),
+            )
+        )
+        added += 1
+
+    await ensure(ADMIN_EMAIL, "City Admin", UserRole.admin)
+    for dept, dept_id in dept_ids.items():
+        slug = dept.lower().split()[0]
+        await ensure(
+            f"official.{slug}@civicpulse.gov.in",
+            f"{dept} Officer",
+            UserRole.official,
+            dept_id=dept_id,
+            head=True,
+        )
+    return added
+
+
 async def main() -> None:
     async with session_factory() as session:
         dept_ids = await seed_departments(session)
         added_cats = await seed_categories(session, dept_ids)
+        added_staff = await seed_staff(session, dept_ids)
         await session.commit()
-        print(f"departments: {len(dept_ids)}, new categories: {added_cats}")
+        print(
+            f"departments: {len(dept_ids)}, new categories: {added_cats}, "
+            f"new staff: {added_staff} (admin={ADMIN_EMAIL}, pw={DEMO_PASSWORD})"
+        )
 
         if WARD_GEOJSON.exists():
             fc = json.loads(WARD_GEOJSON.read_text(encoding="utf-8"))

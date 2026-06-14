@@ -21,8 +21,8 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      await login(email, password);
-      router.push("/report");
+      const u = await login(email, password);
+      router.push(u.role === "citizen" ? "/report" : "/console");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed");
     } finally {

@@ -64,3 +64,8 @@ def client_meta(request: Request) -> tuple[str | None, str | None]:
     ua = request.headers.get("User-Agent")
     ip = request.client.host if request.client else None
     return ua, ip
+
+
+# Reusable role-gated dependencies. "Staff" = official (incl. department heads) or admin.
+StaffUser = Annotated[User, Depends(require_roles(UserRole.official, UserRole.admin))]
+AdminUser = Annotated[User, Depends(require_roles(UserRole.admin))]

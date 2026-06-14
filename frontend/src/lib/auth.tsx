@@ -10,12 +10,14 @@ export type User = {
   full_name: string;
   role: "citizen" | "official" | "admin";
   preferred_language: string;
+  department_id: number | null;
+  is_department_head: boolean;
 };
 
 type AuthState = {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
 };
 
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     setAccessToken(res.access_token);
     setUser(res.user);
+    return res.user;
   }
 
   async function logout() {

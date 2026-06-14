@@ -116,6 +116,24 @@ async def test_reregister_unverified_reissues_code() -> None:
         assert ok.status_code == 200
 
 
+async def test_dev_otp_never_exposed_in_prod(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The dev convenience (returning the code in the response) MUST be dev-only.
+    # In prod the code is delivered only via real email; the API never leaks it.
+    from app.api.v1 import auth as auth_module
+
+    monkeypatch.setattr(auth_module.settings, "env", "prod")
+    email = f"prod+{uuid4().hex[:8]}@example.com"
+    async with _client() as client:
+        r = await client.post(
+            "/api/v1/auth/register",
+            json={"email": email, "password": "supersecret123", "full_name": "Prod"},
+        )
+        assert r.status_code == 201
+        assert "dev_otp" not in r.json()  # never in the response body
+    # ...but a code WAS issued (it would be emailed in prod), so verification works
+    assert await redis_client.get(_key(email)) is not None
+
+
 async def test_me_requires_auth() -> None:
     async with _client() as client:
         r = await client.get("/api/v1/auth/me")

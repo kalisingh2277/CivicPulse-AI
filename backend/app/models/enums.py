@@ -37,3 +37,8 @@ class ModerationStatus(enum.StrEnum):
     pending = "pending"
     approved = "approved"
     flagged = "flagged"
+
+
+class NotificationChannel(enum.StrEnum):
+    inapp = "inapp"
+    email = "email"

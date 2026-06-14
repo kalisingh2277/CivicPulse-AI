@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -21,16 +20,11 @@ from app.schemas.complaint import (
     MediaPresignOut,
 )
 from app.schemas.geo import GeoPoint
-from app.services import geo, storage
+from app.services import codes, geo, storage
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 
 CitizenUser = Annotated[User, Depends(require_roles(UserRole.citizen))]
-
-
-async def _next_public_code(db: SessionDep) -> str:
-    seq = (await db.execute(text("SELECT nextval('complaint_code_seq')"))).scalar_one()
-    return f"CP-{datetime.now(UTC).year}-{seq:06d}"
 
 
 async def _load_for_user(db: SessionDep, complaint_id: UUID, user: User) -> Complaint:
@@ -69,7 +63,7 @@ async def create_complaint(
     ward_id = await geo.find_ward(db, lng, lat)
 
     complaint = Complaint(
-        public_code=await _next_public_code(db),
+        public_code=await codes.next_complaint_code(db),
         citizen_id=user.id,
         description=body.description,
         location=geo.point(lng, lat),
@@ -103,12 +97,14 @@ async def my_complaints(user: CitizenUser, db: SessionDep) -> list[ComplaintOut]
         await db.execute(
             text(
                 """
-                SELECT id, public_code, description, address_text, ward_id,
-                       processing_status, issue_id, created_at,
-                       ST_X(location::geometry) AS lng, ST_Y(location::geometry) AS lat
-                FROM complaints
-                WHERE citizen_id = :uid
-                ORDER BY created_at DESC
+                SELECT c.id, c.public_code, c.description, c.address_text, c.ward_id,
+                       c.processing_status, c.issue_id, c.created_at,
+                       ST_X(c.location::geometry) AS lng, ST_Y(c.location::geometry) AS lat,
+                       i.status AS issue_status, i.public_code AS issue_public_code
+                FROM complaints c
+                LEFT JOIN issues i ON i.id = c.issue_id
+                WHERE c.citizen_id = :uid
+                ORDER BY c.created_at DESC
                 LIMIT 100
                 """
             ),
@@ -124,6 +120,8 @@ async def my_complaints(user: CitizenUser, db: SessionDep) -> list[ComplaintOut]
             ward_id=r["ward_id"],
             processing_status=r["processing_status"],
             issue_id=r["issue_id"],
+            issue_status=r["issue_status"],
+            issue_public_code=r["issue_public_code"],
             location=GeoPoint(coordinates=(r["lng"], r["lat"])),
             created_at=r["created_at"],
         )
@@ -143,6 +141,16 @@ async def get_complaint(complaint_id: UUID, user: CurrentUser, db: SessionDep) -
             {"id": complaint_id},
         )
     ).first()
+    issue_status = issue_code = None
+    if complaint.issue_id is not None:
+        row = (
+            await db.execute(
+                text("SELECT status, public_code FROM issues WHERE id = :id"),
+                {"id": complaint.issue_id},
+            )
+        ).first()
+        if row is not None:
+            issue_status, issue_code = row[0], row[1]
     return ComplaintOut(
         id=complaint.id,
         public_code=complaint.public_code,
@@ -151,6 +159,8 @@ async def get_complaint(complaint_id: UUID, user: CurrentUser, db: SessionDep) -
         ward_id=complaint.ward_id,
         processing_status=complaint.processing_status,
         issue_id=complaint.issue_id,
+        issue_status=issue_status,
+        issue_public_code=issue_code,
         location=GeoPoint(coordinates=(coords[0], coords[1])),
         created_at=complaint.created_at,
         media=await _media_out(db, complaint_id),

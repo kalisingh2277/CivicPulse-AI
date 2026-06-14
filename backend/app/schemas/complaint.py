@@ -47,6 +47,9 @@ class ComplaintOut(BaseModel):
     ward_id: int | None
     processing_status: ProcessingStatus
     issue_id: UUID | None
+    # The citizen tracks the *issue's* status once their complaint is triaged.
+    issue_status: str | None = None
+    issue_public_code: str | None = None
     location: GeoPoint
     created_at: datetime
     media: list[MediaOut] = []
