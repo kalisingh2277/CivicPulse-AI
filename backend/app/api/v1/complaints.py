@@ -2,11 +2,14 @@ from typing import Annotated
 from uuid import UUID, uuid4
 
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import func, select, text
 
+from app.ai import dedup, embeddings
 from app.api.deps import CurrentUser, require_roles
+from app.core.config import get_settings
 from app.core.db import SessionDep
+from app.core.queue import enqueue_process_complaint
 from app.core.ratelimit import enforce_daily_complaint_limit
 from app.models.complaint import Complaint, ComplaintMedia
 from app.models.enums import ProcessingStatus, UserRole
@@ -18,9 +21,15 @@ from app.schemas.complaint import (
     MediaOut,
     MediaPresignIn,
     MediaPresignOut,
+    SimilarCheckIn,
+    SimilarCheckOut,
+    SimilarIssueOut,
 )
 from app.schemas.geo import GeoPoint
 from app.services import codes, geo, storage
+from app.services.pipeline import run_pipeline
+
+settings = get_settings()
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 
@@ -56,7 +65,10 @@ async def _media_out(db: SessionDep, complaint_id: UUID) -> list[MediaOut]:
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ComplaintOut)
 async def create_complaint(
-    body: ComplaintCreate, user: CitizenUser, db: SessionDep
+    body: ComplaintCreate,
+    user: CitizenUser,
+    db: SessionDep,
+    background: BackgroundTasks,
 ) -> ComplaintOut:
     await enforce_daily_complaint_limit(str(user.id))
     lng, lat = body.location.lng, body.location.lat
@@ -76,7 +88,13 @@ async def create_complaint(
     await db.commit()
     await db.refresh(complaint)
 
-    # Day 5 wires the AI pipeline here: enqueue process_complaint(complaint.id)
+    # Kick off the AI pipeline off the request path: inline (BackgroundTasks) in dev,
+    # or enqueued to the arq worker when pipeline_inline is false.
+    if settings.pipeline_inline:
+        background.add_task(run_pipeline, str(complaint.id))
+    else:
+        await enqueue_process_complaint(str(complaint.id))
+
     return ComplaintOut(
         id=complaint.id,
         public_code=complaint.public_code,
@@ -88,6 +106,38 @@ async def create_complaint(
         location=GeoPoint(coordinates=(lng, lat)),
         created_at=complaint.created_at,
         media=[],
+    )
+
+
+@router.post("/similar-check", response_model=SimilarCheckOut)
+async def similar_check(body: SimilarCheckIn, user: CitizenUser, db: SessionDep) -> SimilarCheckOut:
+    """Pre-submit duplicate intercept: embed the draft and look for nearby open
+    issues. Category-agnostic (the citizen hasn't picked one) — broader than the
+    pipeline's auto-attach. Synchronous because the citizen is waiting (~30 ms embed)."""
+    emb = await embeddings.aembed_query(body.description)
+    found = await dedup.find_similar_issues(
+        db,
+        emb,
+        body.location.lng,
+        body.location.lat,
+        radius_m=settings.dedup_radius_m,
+        min_sim=settings.similar_check_min_sim,
+        limit=3,
+    )
+    return SimilarCheckOut(
+        candidates=[
+            SimilarIssueOut(
+                issue_id=s.issue_id,
+                public_code=s.public_code,
+                title=s.title,
+                status=s.status,
+                complaint_count=s.complaint_count,
+                upvote_count=s.upvote_count,
+                similarity=s.similarity,
+                distance_m=s.distance_m,
+            )
+            for s in found
+        ]
     )
 
 

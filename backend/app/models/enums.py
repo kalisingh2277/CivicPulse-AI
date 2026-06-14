@@ -42,3 +42,18 @@ class ModerationStatus(enum.StrEnum):
 class NotificationChannel(enum.StrEnum):
     inapp = "inapp"
     email = "email"
+
+
+class CorrectionKind(enum.StrEnum):
+    recategorize = "recategorize"
+    detach = "detach"
+    merge = "merge"
+    priority_override = "priority_override"
+    reject = "reject"
+
+
+class AiJobStatus(enum.StrEnum):
+    queued = "queued"
+    running = "running"
+    succeeded = "succeeded"
+    failed = "failed"

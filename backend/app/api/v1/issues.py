@@ -1,12 +1,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import aliased
 
-from app.api.deps import StaffUser
+from app.api.deps import StaffUser, require_roles
 from app.core.db import SessionDep
+from app.models.ai import IssueUpvote
 from app.models.audit import IssueStatusHistory, IssueUpdate
 from app.models.enums import IssueStatus, UserRole
 from app.models.issue import Issue
@@ -22,11 +23,13 @@ from app.schemas.issue import (
     TimelineEntry,
 )
 from app.schemas.user import StaffOut
-from app.services import lifecycle
+from app.services import lifecycle, priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
+CitizenUser = Annotated[User, Depends(require_roles(UserRole.citizen))]
 Assignee = aliased(User)
+_CLOSED = (IssueStatus.closed, IssueStatus.rejected)
 
 
 def _scope_to_user(stmt, user: User):
@@ -219,6 +222,25 @@ async def assign_issue(
     await lifecycle.assign(db, issue, body.assignee_id, user.id)
     await db.commit()
     return await get_issue(issue_id, user, db)
+
+
+@router.post("/{issue_id}/upvote")
+async def upvote_issue(issue_id: UUID, user: CitizenUser, db: SessionDep) -> dict[str, int]:
+    """Citizen 'me too' from the duplicate intercept: subscribe + boost priority.
+    Idempotent — upvoting twice is a no-op."""
+    issue = await db.get(Issue, issue_id)
+    if issue is None or issue.status in _CLOSED:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Issue not available"},
+        )
+    existing = await db.get(IssueUpvote, {"issue_id": issue_id, "user_id": user.id})
+    if existing is None:
+        db.add(IssueUpvote(issue_id=issue_id, user_id=user.id))
+        issue.upvote_count += 1
+        await priority.recompute(db, issue)
+        await db.commit()
+    return {"upvotes": issue.upvote_count}
 
 
 @router.post("/{issue_id}/updates", status_code=status.HTTP_201_CREATED)

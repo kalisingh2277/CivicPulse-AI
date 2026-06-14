@@ -1,7 +1,10 @@
+from app.models.ai import AiJob, Correction, IssueUpvote
 from app.models.audit import IssueStatusHistory, IssueUpdate
 from app.models.base import Base
 from app.models.complaint import Complaint, ComplaintMedia
 from app.models.enums import (
+    AiJobStatus,
+    CorrectionKind,
     CvStatus,
     IssueStatus,
     ModerationStatus,
@@ -22,6 +25,8 @@ __all__ = [
     "CvStatus",
     "ModerationStatus",
     "NotificationChannel",
+    "CorrectionKind",
+    "AiJobStatus",
     "Category",
     "Department",
     "Ward",
@@ -34,4 +39,7 @@ __all__ = [
     "IssueStatusHistory",
     "IssueUpdate",
     "Notification",
+    "AiJob",
+    "Correction",
+    "IssueUpvote",
 ]

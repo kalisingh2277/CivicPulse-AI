@@ -154,6 +154,13 @@ async def main() -> None:
             f"new staff: {added_staff} (admin={ADMIN_EMAIL}, pw={DEMO_PASSWORD})"
         )
 
+        # Build category prototype embeddings for zero-shot categorization.
+        # (Also warms/downloads the embedding model so later runs are fast.)
+        from app.ai.categorize import ensure_category_embeddings
+
+        embedded = await ensure_category_embeddings(session)
+        print(f"category embeddings computed: {embedded}")
+
         if WARD_GEOJSON.exists():
             fc = json.loads(WARD_GEOJSON.read_text(encoding="utf-8"))
             n = await ward_service.import_feature_collection(

@@ -14,6 +14,26 @@ class ComplaintCreate(BaseModel):
     declined_intercept: bool = False
 
 
+class SimilarCheckIn(BaseModel):
+    description: str = Field(min_length=5, max_length=2000)
+    location: GeoPoint
+
+
+class SimilarIssueOut(BaseModel):
+    issue_id: str
+    public_code: str
+    title: str
+    status: str
+    complaint_count: int
+    upvote_count: int
+    similarity: float
+    distance_m: float
+
+
+class SimilarCheckOut(BaseModel):
+    candidates: list[SimilarIssueOut]
+
+
 class MediaPresignIn(BaseModel):
     mime: str
     bytes: int = Field(gt=0)

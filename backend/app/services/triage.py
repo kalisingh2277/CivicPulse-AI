@@ -20,11 +20,11 @@ async def create_issue_from_complaint(
     db: AsyncSession,
     complaint: Complaint,
     category_id: int,
-    actor_id: UUID,
+    actor_id: UUID | None,
     title: str | None = None,
 ) -> Issue:
-    """Manual triage: turn a single complaint into a new issue and attach it.
-    Day 5's pipeline automates this (and the dedup attach-to-existing path)."""
+    """Turn a single complaint into a new issue and attach it. actor_id is None when
+    the AI pipeline creates the issue automatically; a UUID for manual triage."""
     if complaint.ward_id is None:
         raise TriageError("Complaint has no ward (outside city) — cannot create an issue")
     category = await db.get(Category, category_id)
