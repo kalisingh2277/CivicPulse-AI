@@ -1,4 +1,5 @@
 from app.models.ai import AiJob, Correction, IssueUpvote
+from app.models.analytics import DailyStat
 from app.models.audit import IssueStatusHistory, IssueUpdate
 from app.models.base import Base
 from app.models.complaint import Complaint, ComplaintMedia
@@ -42,4 +43,5 @@ __all__ = [
     "AiJob",
     "Correction",
     "IssueUpvote",
+    "DailyStat",
 ]

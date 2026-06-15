@@ -15,9 +15,14 @@ export function Nav() {
       </Link>
       <div className="flex items-center gap-4 text-sm">
         {isStaff ? (
-          <Link href="/console" className="hover:underline">
-            Console
-          </Link>
+          <>
+            <Link href="/console" className="hover:underline">
+              Console
+            </Link>
+            <Link href="/console/analytics" className="hover:underline">
+              Analytics
+            </Link>
+          </>
         ) : (
           <>
             <Link href="/report" className="hover:underline">
@@ -28,6 +33,9 @@ export function Nav() {
             </Link>
           </>
         )}
+        <Link href="/public" className="hover:underline">
+          Transparency
+        </Link>
         {loading ? null : user ? (
           <>
             <NotificationsBell />
