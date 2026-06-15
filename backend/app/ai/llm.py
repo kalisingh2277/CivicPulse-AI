@@ -66,6 +66,34 @@ async def classify(description: str, categories: list[tuple[int, str]]) -> tuple
     return None
 
 
+async def hypothesize_causes(stats: dict) -> str:
+    """A short, clearly-labeled root-cause HYPOTHESIS from cluster stats. The LLM only
+    narrates numbers we pass in — it never invents figures. Mock/fallback builds a
+    deterministic sentence so this works offline."""
+    ward = stats.get("ward_name", "this ward")
+    top = stats.get("top_category", "issues")
+    ratio = stats.get("ratio", 1.0)
+    recent = stats.get("recent_per_week", 0)
+    fallback = (
+        f"{ward} shows about a {ratio:.1f}x rise in '{top}' reports "
+        f"(~{recent:.0f}/week recently vs its prior baseline). Likely drivers to check: "
+        f"localized infrastructure stress, recent weather, or a single recurring source. "
+        f"This is an AI hypothesis — verify on the ground before acting."
+    )
+    if not _use_gemini():
+        return fallback
+    prompt = (
+        "You are assisting a city official. Given these ward statistics, write a 2-3 "
+        "sentence root-cause HYPOTHESIS (label it as a hypothesis, do not invent numbers "
+        "beyond those given).\n"
+        f"Stats: {json.dumps(stats)}"
+    )
+    result = await _generate_json(prompt + '\n\nRespond as JSON: {"hypothesis": "<text>"}')
+    if result and result.get("hypothesis"):
+        return str(result["hypothesis"])
+    return fallback
+
+
 async def title(description: str, category_name: str, address: str | None) -> str:
     """A short issue title. Mock/fallback uses a clean template; Gemini sharpens it."""
     fallback = f"{category_name} near {address or 'reported location'}"
