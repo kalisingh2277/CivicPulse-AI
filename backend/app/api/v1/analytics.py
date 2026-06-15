@@ -5,8 +5,16 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import AdminUser, StaffUser
 from app.core.db import SessionDep
-from app.schemas.analytics import DepartmentRow, HeatCell, TrendPoint
-from app.services import analytics
+from app.schemas.analytics import (
+    DepartmentRow,
+    ForecastOut,
+    HeatCell,
+    Hotspot,
+    RootCauseOut,
+    TrendPoint,
+    WardRisk,
+)
+from app.services import analytics, predictive
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -41,3 +49,27 @@ async def trends(
 async def departments(_: AdminUser, db: SessionDep) -> list[DepartmentRow]:
     rows = await analytics.department_performance(db)
     return [DepartmentRow(**r) for r in rows]
+
+
+@router.get("/hotspots", response_model=list[Hotspot])
+async def hotspots(_: StaffUser, db: SessionDep) -> list[Hotspot]:
+    """Emerging ward x category cells: recent rate >= 2x the trailing-8-week baseline."""
+    return [Hotspot(**h) for h in await predictive.emerging_hotspots(db)]
+
+
+@router.get("/forecast", response_model=ForecastOut)
+async def forecast(
+    _: StaffUser, db: SessionDep, category_id: int, ward_id: int | None = None
+) -> ForecastOut:
+    """4-week SARIMAX forecast (with 80% CI) for a category, optionally ward-scoped."""
+    return ForecastOut(**await predictive.forecast(db, category_id, ward_id))
+
+
+@router.get("/wards/risk", response_model=list[WardRisk])
+async def wards_risk(_: AdminUser, db: SessionDep) -> list[WardRisk]:
+    return [WardRisk(**r) for r in await predictive.ward_risk(db)]
+
+
+@router.get("/wards/{ward_id}/root-cause", response_model=RootCauseOut)
+async def root_cause(ward_id: int, _: AdminUser, db: SessionDep) -> RootCauseOut:
+    return RootCauseOut(**await predictive.root_cause(db, ward_id))
