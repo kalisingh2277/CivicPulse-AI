@@ -7,6 +7,7 @@ honest rules beat a black box trained on nothing (see ADR-10 / PRD risk table).
 import math
 from datetime import UTC, datetime
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.issue import Issue
@@ -28,7 +29,18 @@ async def recompute(db: AsyncSession, issue: Issue) -> None:
     age_days = (datetime.now(UTC) - first).total_seconds() / 86400
     age = min(age_days / 14, 1.0)
 
-    cv = 0.0  # filled by CV in Day 6
+    # CV signal: strongest defect severity any photo on this issue showed (Day 8).
+    cv_row = (
+        await db.execute(
+            text(
+                "SELECT max((cm.cv_result->>'severity')::float) "
+                "FROM complaint_media cm JOIN complaints c ON c.id = cm.complaint_id "
+                "WHERE c.issue_id = :iid AND cm.cv_result IS NOT NULL"
+            ),
+            {"iid": issue.id},
+        )
+    ).scalar()
+    cv = float(cv_row) if cv_row is not None else 0.0
     poi = 0.0  # proximity to schools/hospitals — later
 
     factors = {

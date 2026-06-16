@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ApiError } from "@/lib/api";
 import {
   IssueDetail,
+  IssueMedia,
   IssueStatus,
   NEXT_STATUSES,
   StaffMember,
@@ -25,6 +26,7 @@ export default function IssueDetailPage() {
 
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [media, setMedia] = useState<IssueMedia[]>([]);
   const [assignees, setAssignees] = useState<StaffMember[]>([]);
   const [note, setNote] = useState("");
   const [updateBody, setUpdateBody] = useState("");
@@ -34,12 +36,14 @@ export default function IssueDetailPage() {
   const canAssign = user?.role === "admin" || user?.is_department_head;
 
   const load = useCallback(async () => {
-    const [iss, tl] = await Promise.all([
+    const [iss, tl, md] = await Promise.all([
       consoleApi.getIssue(id),
       consoleApi.timeline(id),
+      consoleApi.issueMedia(id).catch(() => []),
     ]);
     setIssue(iss);
     setTimeline(tl);
+    setMedia(md);
     if (canAssign) setAssignees(await consoleApi.assignees(iss.department_id));
   }, [id, canAssign]);
 
@@ -177,6 +181,43 @@ export default function IssueDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Photos + AI detection */}
+      {media.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm font-medium">Photos &amp; AI detection</h2>
+          <div className="flex flex-wrap gap-3">
+            {media.map((m) => (
+              <div key={m.id} className="w-40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={m.url}
+                  alt="complaint"
+                  className="h-28 w-40 rounded-md border border-neutral-200 object-cover"
+                />
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {m.cv_result?.labels?.map((l, i) => (
+                    <span
+                      key={i}
+                      className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-800"
+                    >
+                      {l.label} {Math.round(l.conf * 100)}%
+                    </span>
+                  ))}
+                  {m.moderation === "flagged" && (
+                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">
+                      flagged
+                    </span>
+                  )}
+                  {m.cv_status === "pending" && (
+                    <span className="text-xs text-neutral-400">analyzing…</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Add update */}
       <section className="mt-6">

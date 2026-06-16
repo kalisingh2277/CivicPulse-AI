@@ -9,9 +9,16 @@ from app.core.security import hash_password
 from app.models.user import OfficialWard, User
 from app.schemas.user import InviteIn, StaffOut
 from app.schemas.ward import WardImportRequest, WardImportResult
+from app.services import sla
 from app.services import wards as ward_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/jobs/scan-sla")
+async def scan_sla_job(_: AdminUser, db: SessionDep) -> dict[str, int]:
+    """Trigger the SLA breach scan (runs hourly via the worker cron in prod)."""
+    return {"breached": await sla.scan_sla(db)}
 
 
 @router.post("/wards/import", response_model=WardImportResult)

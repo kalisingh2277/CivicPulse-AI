@@ -13,8 +13,18 @@ def redis_settings() -> RedisSettings:
 _pool: ArqRedis | None = None
 
 
-async def enqueue_process_complaint(complaint_id: str) -> None:
+async def _get_pool() -> ArqRedis:
     global _pool
     if _pool is None:
         _pool = await create_pool(redis_settings())
-    await _pool.enqueue_job("process_complaint", str(complaint_id))
+    return _pool
+
+
+async def enqueue_process_complaint(complaint_id: str) -> None:
+    pool = await _get_pool()
+    await pool.enqueue_job("process_complaint", str(complaint_id))
+
+
+async def enqueue_analyze_media(media_id: str) -> None:
+    pool = await _get_pool()
+    await pool.enqueue_job("analyze_media", str(media_id))

@@ -91,9 +91,31 @@ export const NEXT_STATUSES: Record<IssueStatus, IssueStatus[]> = {
   rejected: [],
 };
 
+export type IssueMedia = {
+  id: string;
+  url: string;
+  mime: string;
+  cv_status: string;
+  cv_result: { labels?: { label: string; conf: number }[]; severity?: number } | null;
+  moderation: string | null;
+};
+
+export type ReportListItem = {
+  id: string;
+  period_start: string;
+  period_end: string;
+  scope: string;
+  created_at: string;
+};
+export type Report = ReportListItem & {
+  stats: Record<string, unknown>;
+  content_md: string | null;
+};
+
 export const consoleApi = {
   listIssues: (qs = "") => api.get<IssuePage>(`/issues${qs}`),
   getIssue: (id: string) => api.get<IssueDetail>(`/issues/${id}`),
+  issueMedia: (id: string) => api.get<IssueMedia[]>(`/issues/${id}/media`),
   timeline: (id: string) => api.get<TimelineEntry[]>(`/issues/${id}/timeline`),
   changeStatus: (id: string, to_status: IssueStatus, note?: string) =>
     api.patch<IssueDetail>(`/issues/${id}/status`, { to_status, note }),
@@ -107,4 +129,8 @@ export const consoleApi = {
   createIssue: (complaintId: string, category_id: number, title?: string) =>
     api.post<IssueDetail>(`/triage/${complaintId}/create-issue`, { category_id, title }),
   categories: () => api.get<Category[]>("/categories"),
+  listReports: () => api.get<ReportListItem[]>("/reports"),
+  getReport: (id: string) => api.get<Report>(`/reports/${id}`),
+  generateReport: () => api.post<Report>("/reports/generate"),
+  scanSla: () => api.post<{ breached: number }>("/admin/jobs/scan-sla"),
 };

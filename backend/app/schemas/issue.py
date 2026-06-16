@@ -47,6 +47,10 @@ class AssignIn(BaseModel):
     assignee_id: UUID
 
 
+class ReopenIn(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
 class IssueUpdateIn(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     is_internal: bool = False

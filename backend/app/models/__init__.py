@@ -16,6 +16,7 @@ from app.models.enums import (
 from app.models.issue import Issue
 from app.models.notification import Notification
 from app.models.org import Category, Department, Ward
+from app.models.report import Report
 from app.models.user import OfficialWard, Session, User
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "Correction",
     "IssueUpvote",
     "DailyStat",
+    "Report",
 ]

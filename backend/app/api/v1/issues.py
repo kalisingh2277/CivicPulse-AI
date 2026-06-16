@@ -12,6 +12,7 @@ from app.models.audit import IssueStatusHistory, IssueUpdate
 from app.models.enums import IssueStatus, UserRole
 from app.models.issue import Issue
 from app.models.user import User
+from app.schemas.complaint import MediaOut
 from app.schemas.geo import GeoPoint
 from app.schemas.issue import (
     AssignIn,
@@ -19,11 +20,12 @@ from app.schemas.issue import (
     IssueListItem,
     IssuePage,
     IssueUpdateIn,
+    ReopenIn,
     StatusTransitionIn,
     TimelineEntry,
 )
 from app.schemas.user import StaffOut
-from app.services import lifecycle, priority
+from app.services import lifecycle, priority, storage
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
@@ -150,6 +152,39 @@ async def get_issue(issue_id: UUID, user: StaffUser, db: SessionDep) -> IssueDet
     )
 
 
+@router.get("/{issue_id}/media", response_model=list[MediaOut])
+async def issue_media(issue_id: UUID, user: StaffUser, db: SessionDep) -> list[MediaOut]:
+    """All photos across the complaints on this issue, with their CV detections."""
+    await _load_scoped(db, issue_id, user)
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT cm.id, cm.object_key, cm.mime, cm.cv_status::text AS cv_status,
+                       cm.cv_result, cm.moderation::text AS moderation
+                FROM complaint_media cm
+                JOIN complaints c ON c.id = cm.complaint_id
+                WHERE c.issue_id = :iid
+                ORDER BY cm.created_at
+                """
+            ),
+            {"iid": issue_id},
+        )
+    ).mappings()
+    return [
+        MediaOut(
+            id=r["id"],
+            object_key=r["object_key"],
+            mime=r["mime"],
+            url=storage.presign_get(r["object_key"]),
+            cv_status=r["cv_status"],
+            cv_result=r["cv_result"],
+            moderation=r["moderation"],
+        )
+        for r in rows
+    ]
+
+
 @router.get("/{issue_id}/timeline", response_model=list[TimelineEntry])
 async def get_timeline(issue_id: UUID, user: StaffUser, db: SessionDep) -> list[TimelineEntry]:
     await _load_scoped(db, issue_id, user)
@@ -222,6 +257,58 @@ async def assign_issue(
     await lifecycle.assign(db, issue, body.assignee_id, user.id)
     await db.commit()
     return await get_issue(issue_id, user, db)
+
+
+async def _is_linked(db: SessionDep, issue_id: UUID, user_id: UUID) -> bool:
+    """A citizen is 'linked' to an issue if they reported it or upvoted it."""
+    row = (
+        await db.execute(
+            text(
+                "SELECT 1 FROM complaints WHERE issue_id = :i AND citizen_id = :u "
+                "UNION SELECT 1 FROM issue_upvotes WHERE issue_id = :i AND user_id = :u LIMIT 1"
+            ),
+            {"i": issue_id, "u": user_id},
+        )
+    ).first()
+    return row is not None
+
+
+async def _citizen_transition(
+    issue_id: UUID, user: User, db: SessionDep, to: IssueStatus, note: str | None
+) -> dict[str, str]:
+    issue = await db.get(Issue, issue_id)
+    if issue is None or not await _is_linked(db, issue_id, user.id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Issue not found"},
+        )
+    try:
+        await lifecycle.transition(db, issue, to, actor_id=user.id, note=note)
+    except lifecycle.TransitionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "invalid_transition", "message": str(e)},
+        ) from e
+    await db.commit()
+    return {"status": issue.status.value}
+
+
+@router.post("/{issue_id}/confirm-resolution")
+async def confirm_resolution(issue_id: UUID, user: CitizenUser, db: SessionDep) -> dict[str, str]:
+    """Citizen confirms a resolved issue is actually fixed → closed."""
+    return await _citizen_transition(
+        issue_id, user, db, IssueStatus.closed, note="Citizen confirmed resolution"
+    )
+
+
+@router.post("/{issue_id}/reopen")
+async def reopen(
+    issue_id: UUID, body: ReopenIn, user: CitizenUser, db: SessionDep
+) -> dict[str, str]:
+    """Citizen disputes a resolution → reopened, back into the official queue."""
+    return await _citizen_transition(
+        issue_id, user, db, IssueStatus.reopened, note=f"Reopened by citizen: {body.reason}"
+    )
 
 
 @router.post("/{issue_id}/upvote")

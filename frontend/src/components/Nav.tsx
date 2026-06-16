@@ -25,6 +25,9 @@ export function Nav() {
             <Link href="/console/predictive" className="hover:underline">
               Predictive
             </Link>
+            <Link href="/console/reports" className="hover:underline">
+              Reports
+            </Link>
           </>
         ) : (
           <>

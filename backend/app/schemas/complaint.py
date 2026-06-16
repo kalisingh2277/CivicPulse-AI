@@ -57,6 +57,8 @@ class MediaOut(BaseModel):
     mime: str
     url: str
     cv_status: str
+    cv_result: dict | None = None
+    moderation: str | None = None
 
 
 class ComplaintOut(BaseModel):
