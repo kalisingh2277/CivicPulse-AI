@@ -35,11 +35,13 @@ random.seed(42)
 DAYS = 430  # ~14 months back from today
 NUM_WARDS = 50  # subset for density
 NUM_CITIZENS = 25
-BASE_LAMBDA = 0.012  # issues per ward x category x day
+BASE_LAMBDA = 0.012  # baseline issues per ward x category x day
 MONSOON_MONTHS = {6, 7, 8, 9}
 MONSOON_CATEGORIES = {"Waterlogging / flooding", "Water pipe leakage", "No water supply"}
+MONSOON_LAMBDA = 0.25  # water categories surge in monsoon (absolute daily rate)
 HOTSPOT_CATEGORY = "Pothole"
-HOTSPOT_RAMP_DAYS = 70
+HOTSPOT_SURGE_DAYS = 21  # the hotspot ward spikes over the last 3 weeks
+HOTSPOT_LAMBDA = 0.8  # ~11 pothole reports in 14 days vs a near-zero baseline
 
 DESC = {
     "Pothole": "Pothole on the road causing problems for commuters",
@@ -84,13 +86,14 @@ async def _citizen_ids(db) -> list:
 
 
 def _lambda(ward_id: int, cat_name: str, day: datetime, hotspot_ward: int, today) -> float:
+    days_ago = (today - day.date()).days
     lam = BASE_LAMBDA
+    # Monsoon: water categories surge Jun–Sep (seasonality the forecast can show).
     if day.month in MONSOON_MONTHS and cat_name in MONSOON_CATEGORIES:
-        lam *= 6.0
-    if ward_id == hotspot_ward and cat_name == HOTSPOT_CATEGORY:
-        days_ago = (today - day.date()).days
-        if days_ago <= HOTSPOT_RAMP_DAYS:
-            lam *= 1 + 8 * (1 - days_ago / HOTSPOT_RAMP_DAYS)
+        lam = MONSOON_LAMBDA
+    # Hotspot: one ward's potholes spike sharply in the last 3 weeks (emerging signal).
+    if ward_id == hotspot_ward and cat_name == HOTSPOT_CATEGORY and days_ago <= HOTSPOT_SURGE_DAYS:
+        lam = HOTSPOT_LAMBDA
     return lam
 
 

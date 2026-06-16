@@ -17,7 +17,7 @@ from app.ai import llm
 
 RECENT_DAYS = 14
 BASELINE_DAYS = 56  # the 8 weeks before the recent window
-MIN_RECENT = 5  # ignore low-volume noise
+MIN_RECENT = 3  # ignore low-volume noise (tuned to the per-ward×category scale)
 EMERGING_RATIO = 2.0
 MIN_HISTORY_WEEKS = 12
 

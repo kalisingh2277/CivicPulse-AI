@@ -9,7 +9,7 @@ export function Nav() {
   const { user, logout, loading } = useAuth();
   const isStaff = user?.role === "official" || user?.role === "admin";
   return (
-    <nav className="flex items-center justify-between border-b border-neutral-200 px-6 py-3">
+    <nav className="sticky top-0 z-30 flex items-center justify-between border-b border-neutral-200 bg-white/90 px-6 py-3 backdrop-blur">
       <Link href="/" className="text-lg font-semibold">
         CivicPulse AI
       </Link>

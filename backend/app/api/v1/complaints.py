@@ -10,7 +10,7 @@ from app.api.deps import CurrentUser, require_roles
 from app.core.config import get_settings
 from app.core.db import SessionDep
 from app.core.queue import enqueue_analyze_media, enqueue_process_complaint
-from app.core.ratelimit import enforce_daily_complaint_limit
+from app.core.ratelimit import enforce_daily_complaint_limit, similar_check_rate_limit
 from app.models.complaint import Complaint, ComplaintMedia
 from app.models.enums import ProcessingStatus, UserRole
 from app.models.user import User
@@ -113,7 +113,12 @@ async def create_complaint(
 
 
 @router.post("/similar-check", response_model=SimilarCheckOut)
-async def similar_check(body: SimilarCheckIn, user: CitizenUser, db: SessionDep) -> SimilarCheckOut:
+async def similar_check(
+    body: SimilarCheckIn,
+    user: CitizenUser,
+    db: SessionDep,
+    _: None = Depends(similar_check_rate_limit),
+) -> SimilarCheckOut:
     """Pre-submit duplicate intercept: embed the draft and look for nearby open
     issues. Category-agnostic (the citizen hasn't picked one) — broader than the
     pipeline's auto-attach. Synchronous because the citizen is waiting (~30 ms embed)."""

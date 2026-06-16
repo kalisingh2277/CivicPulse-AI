@@ -32,6 +32,11 @@ async def otp_rate_limit(request: Request) -> None:
     await rate_limit(request, "otp", 10)
 
 
+async def similar_check_rate_limit(request: Request) -> None:
+    # similar-check embeds text + runs a vector query on each keystroke-ish call.
+    await rate_limit(request, "similar", 30)
+
+
 async def enforce_daily_complaint_limit(user_id: str, limit: int = 10) -> None:
     """Per-citizen daily cap on complaint creation (keyed by user, not IP)."""
     key = f"rl:complaint:{user_id}"
