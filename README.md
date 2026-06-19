@@ -1,5 +1,15 @@
 # CivicPulse AI — Predictive Urban Governance Platform
 
+<p align="center">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-PostGIS%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-47%20passing-brightgreen">
+</p>
+
 Most civic complaint systems are reactive and complaint-centric: fifty residents
 report the same pothole, the city opens fifty tickets, fixes one hole, closes one
 ticket, and forty-nine people feel ignored.
@@ -18,6 +28,36 @@ entity, separate from a **Complaint** (one person's report of it). Deduplication
 operates on issues; every citizen-facing screen on complaints.
 
 Pilot city: **Bengaluru** (real BBMP ward boundaries).
+
+---
+
+<p align="center">
+  <img src="docs/screenshots/04-analytics.png" alt="City analytics — complaint heatmap and weekly trend" width="850"><br>
+  <sub><b>City analytics</b> — live complaint heatmap (PostGIS grid) + weekly new-vs-resolved trend.</sub>
+</p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/03-predictive.png" alt="Predictive governance"><br>
+      <sub><b>Predictive governance</b> — emerging hotspots + SARIMA forecast with confidence band.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/02-console-triage.png" alt="Official console"><br>
+      <sub><b>Official console</b> — deduplicated, priority-scored issue queue with SLA badges.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/01-public-dashboard.png" alt="Public transparency dashboard"><br>
+      <sub><b>Public dashboard</b> — anonymized, no-login city transparency view.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/06-report-map.png" alt="Citizen report"><br>
+      <sub><b>Citizen report</b> — map pin + photo, in any language, with a duplicate intercept.</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -147,3 +187,7 @@ annual seasonality, on this much data. CV is zero-shot (Gemini) — the fine-tun
 detector and PDF report export are documented post-MVP work. The eval set is small
 (indicative, not production-grade). These are deliberate, documented trade-offs — not
 hidden gaps.
+
+## License
+
+[MIT](LICENSE) © 2026 Kali Singh.
