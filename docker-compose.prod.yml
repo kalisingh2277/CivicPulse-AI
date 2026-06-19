@@ -56,7 +56,7 @@ services:
 
   # One-shot: apply migrations, then exit. api waits for it to finish.
   migrate:
-    build: { context: ./backend, target: api }
+    build: { context: ./backend, target: api, network: host }
     command: [".venv/bin/alembic", "upgrade", "head"]
     env_file: [.env.prod]
     environment:
@@ -65,12 +65,15 @@ services:
       postgres: { condition: service_healthy }
 
   api:
-    build: { context: ./backend, target: api }
+    build: { context: ./backend, target: api, network: host }
     env_file: [.env.prod]
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-civicpulse}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-civicpulse}
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: ${PUBLIC_S3_ENDPOINT_URL}
+      FASTEMBED_CACHE_PATH: /models
+    # Persist the ~120MB embedding model so it downloads once, not per container.
+    volumes: [model-cache:/models]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -78,7 +81,7 @@ services:
     restart: unless-stopped
 
   worker:
-    build: { context: ./backend, target: api }
+    build: { context: ./backend, target: api, network: host }
     command: [".venv/bin/arq", "workers.main.WorkerSettings"]
     env_file: [.env.prod]
     environment:
@@ -86,6 +89,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
       PIPELINE_INLINE: "false"
+      FASTEMBED_CACHE_PATH: /models
+    volumes: [model-cache:/models]
     depends_on:
       redis: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
@@ -94,8 +99,12 @@ services:
   frontend:
     build:
       context: ./frontend
+      network: host
       args:
-        NEXT_PUBLIC_API_URL: ${SITE_URL}
+        # Empty → the browser calls the API at a relative /api path on whatever
+        # origin served the page (same origin via Caddy). Keeps this image
+        # independent of the (ephemeral) public URL — no rebuild when it changes.
+        NEXT_PUBLIC_API_URL: ""
     restart: unless-stopped
 
   caddy:
@@ -115,3 +124,4 @@ volumes:
   minio-data:
   caddy-data:
   caddy-config:
+  model-cache:

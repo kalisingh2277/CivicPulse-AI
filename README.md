@@ -104,9 +104,20 @@ Open **http://localhost:3000**. API docs: `http://localhost:8000/api/v1/docs`.
 
 ## Deploy
 
-Containerized, single-origin behind Caddy (auto-HTTPS). Local prod, a no-account
-Cloudflare tunnel (to share with someone), or a real VM — see
-[docs/DEPLOY.md](docs/DEPLOY.md).
+Containerized, single-origin behind Caddy (auto-HTTPS): one public URL with `/` →
+frontend, `/api` → API, `/civicpulse-media` → object storage. Deploy to a real VM,
+run local prod, or share instantly over a no-account Cloudflare tunnel:
+
+```powershell
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm api .venv/bin/python -m scripts.seed
+powershell -ExecutionPolicy Bypass -File scripts\share.ps1   # → prints a public URL via Cloudflare tunnel
+```
+
+The frontend image talks to the API on a relative path, so it's independent of the
+(ephemeral) public URL — `share.ps1` brings up the stack, opens the tunnel, wires the
+fresh URL into `.env.prod`, and recreates the API. Full guide (env vars, the three
+deploy paths, presigned-photo + refresh-cookie gotchas) in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Tests & quality
 

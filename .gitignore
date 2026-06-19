@@ -21,6 +21,9 @@ out/
 # backups
 backups/
 
+# local tools (downloaded binaries)
+.tools/
+
 # ml artifacts
 ml/runs/
 *.pt
