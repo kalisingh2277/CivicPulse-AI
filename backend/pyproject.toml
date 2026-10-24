@@ -1,7 +1,7 @@
 [project]
 name = "civicpulse-backend"
 version = "0.1.0"
-description = "CivicPulse AI backend — FastAPI API + AI worker"
+description = "CivicPulse AI backend — FastAPI API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",
@@ -14,7 +14,6 @@ dependencies = [
     "geoalchemy2>=0.16",
     "pgvector>=0.3.6",
     "redis>=5.2",
-    "arq>=0.26",
     "structlog>=24.4",
     "pyjwt>=2.10",
     "argon2-cffi>=23.1",

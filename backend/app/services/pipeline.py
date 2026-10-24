@@ -1,6 +1,6 @@
 """The async AI pipeline (docs/02-user-flows.md F8), as a plain service so it's
-testable without a running worker. The arq task and the inline BackgroundTask both
-just call run_pipeline(complaint_id).
+testable on its own. The API runs it as a FastAPI BackgroundTask by calling
+run_pipeline(complaint_id).
 
 Flow: language → embed → categorize → dedup → (auto-attach | create issue) →
 priority → telemetry. Idempotent: a complaint already triaged is a no-op. Any

@@ -9,7 +9,6 @@ from app.ai import dedup, embeddings
 from app.api.deps import CurrentUser, require_roles
 from app.core.config import get_settings
 from app.core.db import SessionDep
-from app.core.queue import enqueue_analyze_media, enqueue_process_complaint
 from app.core.ratelimit import enforce_daily_complaint_limit, similar_check_rate_limit
 from app.models.complaint import Complaint, ComplaintMedia
 from app.models.enums import ProcessingStatus, UserRole
@@ -91,12 +90,8 @@ async def create_complaint(
     await db.commit()
     await db.refresh(complaint)
 
-    # Kick off the AI pipeline off the request path: inline (BackgroundTasks) in dev,
-    # or enqueued to the arq worker when pipeline_inline is false.
-    if settings.pipeline_inline:
-        background.add_task(run_pipeline, str(complaint.id))
-    else:
-        await enqueue_process_complaint(str(complaint.id))
+    # Kick off the AI pipeline off the request path (FastAPI BackgroundTasks).
+    background.add_task(run_pipeline, str(complaint.id))
 
     return ComplaintOut(
         id=complaint.id,
@@ -299,11 +294,8 @@ async def confirm_media(
     await db.commit()
     await db.refresh(media)
 
-    # Run computer vision off the request path (inline in dev, arq worker in prod).
-    if settings.pipeline_inline:
-        background.add_task(run_analyze_media, str(media.id))
-    else:
-        await enqueue_analyze_media(str(media.id))
+    # Run computer vision off the request path (FastAPI BackgroundTasks).
+    background.add_task(run_analyze_media, str(media.id))
 
     return MediaOut(
         id=media.id,

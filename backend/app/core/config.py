@@ -33,10 +33,6 @@ class Settings(BaseSettings):
     # 384-d, multilingual, paraphrase-tuned (great for dedup); available in fastembed/ONNX
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-    # Run the complaint pipeline inline (BackgroundTasks) vs enqueue to the arq worker.
-    # Inline is the zero-extra-process dev/demo default; prod sets this false + runs the worker.
-    pipeline_inline: bool = True
-
     # Dedup / categorization thresholds — CALIBRATED against ml/eval (see its README).
     # The paraphrase-MiniLM model scores true duplicates lower than e5 would, so these
     # are well below the naive 0.8+ guesses. Sweep: prec/recall at 0.60 = .83/.77,
