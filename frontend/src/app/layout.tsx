@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CivicPulse AI",
-  description: "Predictive urban governance — citizen complaints to city intelligence",
+  description: "Citizen complaints to city intelligence",
 };
 
 export default function RootLayout({

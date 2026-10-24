@@ -168,11 +168,6 @@ export default function ConsolePage() {
                     {i.assigned_to_name ? ` · ${i.assigned_to_name}` : ""}
                   </p>
                 </div>
-                {i.sla_breached && (
-                  <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">
-                    SLA breached
-                  </span>
-                )}
                 <StatusBadge status={i.status} />
               </Link>
             ))}

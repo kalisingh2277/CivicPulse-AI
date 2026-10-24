@@ -102,7 +102,6 @@ export default function AnalyticsPage() {
                   <th className="px-3 py-2">Open</th>
                   <th className="px-3 py-2">Total</th>
                   <th className="px-3 py-2">Median resolution</th>
-                  <th className="px-3 py-2">SLA breach</th>
                   <th className="px-3 py-2">Reopened</th>
                 </tr>
               </thead>
@@ -116,11 +115,6 @@ export default function AnalyticsPage() {
                       {d.median_resolution_hours != null
                         ? `${d.median_resolution_hours} h`
                         : "—"}
-                    </td>
-                    <td
-                      className={`px-3 py-2 ${d.sla_breach_pct > 40 ? "text-red-600" : ""}`}
-                    >
-                      {d.sla_breach_pct}%
                     </td>
                     <td className="px-3 py-2">{d.reopened_pct}%</td>
                   </tr>
