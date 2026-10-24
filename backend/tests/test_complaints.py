@@ -182,7 +182,7 @@ async def test_full_media_upload_flow() -> None:
             json={"object_key": object_key, "mime": "image/png"},
         )
         assert confirm.status_code == 200
-        assert confirm.json()["cv_status"] == "pending"
+        assert confirm.json()["url"]
 
         detail = await client.get(f"/api/v1/complaints/{cid}", headers=_auth(token))
         assert len(detail.json()["media"]) == 1

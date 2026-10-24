@@ -1,4 +1,3 @@
-import base64
 from uuid import uuid4
 
 import httpx
@@ -11,14 +10,11 @@ from app.main import app
 from app.models.complaint import Complaint
 from app.models.issue import Issue
 from app.services.otp import _key
-from app.services.pipeline import analyze_media, run_pipeline
+from app.services.pipeline import run_pipeline
 
 pytestmark = pytest.mark.integration
 
 BLR = (77.5946, 12.9716)
-PNG = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-)
 
 
 @pytest.fixture(autouse=True)
@@ -68,54 +64,6 @@ async def _file_and_process(client: httpx.AsyncClient, token: str, desc: str) ->
     ).json()["id"]
     await run_pipeline(cid)
     return cid
-
-
-async def test_cv_analyzes_photo_and_feeds_priority() -> None:
-    async with _client() as client:
-        token = await _citizen(client)
-        cid = await _file_and_process(client, token, "Huge pothole cratering the main road")
-
-        presign = await client.post(
-            f"/api/v1/complaints/{cid}/media/presign",
-            headers=_auth(token),
-            json={"mime": "image/png", "bytes": len(PNG)},
-        )
-        key = presign.json()["object_key"]
-        async with httpx.AsyncClient() as raw:
-            await raw.put(
-                presign.json()["upload_url"], content=PNG, headers={"Content-Type": "image/png"}
-            )
-        confirm = await client.post(
-            f"/api/v1/complaints/{cid}/media/confirm",
-            headers=_auth(token),
-            json={"object_key": key, "mime": "image/png"},
-        )
-        media_id = confirm.json()["id"]
-
-        # run CV explicitly (inline pipeline is off in tests)
-        result = await analyze_media(media_id)
-        assert result["action"] == "done"
-
-        async with session_factory() as db:
-            row = (
-                (
-                    await db.execute(
-                        text(
-                            "SELECT cv_status::text, cv_result FROM complaint_media WHERE id = :id"
-                        ),
-                        {"id": media_id},
-                    )
-                )
-                .mappings()
-                .one()
-            )
-            assert row["cv_status"] == "done"
-            # category hint was Pothole → CV label should be "pothole"
-            assert row["cv_result"]["labels"][0]["label"] == "pothole"
-
-            complaint = await db.get(Complaint, cid)
-            issue = await db.get(Issue, complaint.issue_id)
-            assert issue.priority_factors["cv"] > 0  # CV severity fed into priority
 
 
 async def test_citizen_can_confirm_and_reopen() -> None:

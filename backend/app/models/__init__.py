@@ -6,7 +6,6 @@ from app.models.complaint import Complaint, ComplaintMedia
 from app.models.enums import (
     AiJobStatus,
     CorrectionKind,
-    CvStatus,
     IssueStatus,
     ModerationStatus,
     ProcessingStatus,
@@ -21,7 +20,6 @@ __all__ = [
     "UserRole",
     "ProcessingStatus",
     "IssueStatus",
-    "CvStatus",
     "ModerationStatus",
     "CorrectionKind",
     "AiJobStatus",

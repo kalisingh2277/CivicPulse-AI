@@ -154,14 +154,13 @@ async def get_issue(issue_id: UUID, user: StaffUser, db: SessionDep) -> IssueDet
 
 @router.get("/{issue_id}/media", response_model=list[MediaOut])
 async def issue_media(issue_id: UUID, user: StaffUser, db: SessionDep) -> list[MediaOut]:
-    """All photos across the complaints on this issue, with their CV detections."""
+    """All photos across the complaints on this issue."""
     await _load_scoped(db, issue_id, user)
     rows = (
         await db.execute(
             text(
                 """
-                SELECT cm.id, cm.object_key, cm.mime, cm.cv_status::text AS cv_status,
-                       cm.cv_result, cm.moderation::text AS moderation
+                SELECT cm.id, cm.object_key, cm.mime, cm.moderation::text AS moderation
                 FROM complaint_media cm
                 JOIN complaints c ON c.id = cm.complaint_id
                 WHERE c.issue_id = :iid
@@ -177,8 +176,6 @@ async def issue_media(issue_id: UUID, user: StaffUser, db: SessionDep) -> list[M
             object_key=r["object_key"],
             mime=r["mime"],
             url=storage.presign_get(r["object_key"]),
-            cv_status=r["cv_status"],
-            cv_result=r["cv_result"],
             moderation=r["moderation"],
         )
         for r in rows

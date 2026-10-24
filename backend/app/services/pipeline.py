@@ -17,15 +17,15 @@ from langdetect.lang_detect_exception import LangDetectException
 from sqlalchemy import text
 
 from app.ai import categorize as categorize_mod
-from app.ai import dedup, embeddings, llm, vision
+from app.ai import dedup, embeddings, llm
 from app.core.config import get_settings
 from app.core.db import session_factory
 from app.models.ai import AiJob
-from app.models.complaint import Complaint, ComplaintMedia
-from app.models.enums import AiJobStatus, CvStatus, ProcessingStatus
+from app.models.complaint import Complaint
+from app.models.enums import AiJobStatus, ProcessingStatus
 from app.models.issue import Issue
 from app.models.org import Category
-from app.services import priority, storage, triage
+from app.services import priority, triage
 
 DetectorFactory.seed = 0  # deterministic language detection
 log = structlog.get_logger()
@@ -59,44 +59,6 @@ async def _attach(db, complaint: Complaint, issue_id: UUID) -> None:
     if issue is not None:
         issue.complaint_count += 1
         await priority.recompute(db, issue)
-
-
-async def analyze_media(media_id: str | UUID) -> dict:
-    """CV step: classify a complaint photo, store the result, and let its severity
-    feed the issue's priority. Idempotent; failure marks the media cv_status=failed
-    but never touches the complaint (CV verifies, never gates)."""
-    mid = UUID(str(media_id))
-    async with session_factory() as db:
-        media = await db.get(ComplaintMedia, mid)
-        if media is None or media.cv_status == CvStatus.done:
-            return {"action": "skip"}
-        complaint = await db.get(Complaint, media.complaint_id)
-        hint = None
-        if complaint is not None and complaint.category_id is not None:
-            cat = await db.get(Category, complaint.category_id)
-            hint = cat.name if cat else None
-        try:
-            image_bytes = None
-            if not settings.mock_ai:
-                image_bytes = await storage.get_bytes(media.object_key)
-            result = await vision.analyze_image(image_bytes, media.mime, hint)
-            media.cv_result = result
-            media.cv_status = CvStatus.done
-            media.moderation = result.get("moderation", "approved")
-            if complaint is not None and complaint.issue_id is not None:
-                issue = await db.get(Issue, complaint.issue_id)
-                if issue is not None:
-                    await priority.recompute(db, issue)
-            await db.commit()
-            return {"action": "done", "labels": result["labels"]}
-        except Exception:
-            log.exception("analyze_media.failed", media_id=str(mid))
-            await db.rollback()
-            failed = await db.get(ComplaintMedia, mid)
-            if failed is not None:
-                failed.cv_status = CvStatus.failed
-            await db.commit()
-            raise
 
 
 async def run_pipeline(complaint_id: str | UUID) -> dict:

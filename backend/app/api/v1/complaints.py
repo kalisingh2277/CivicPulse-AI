@@ -26,7 +26,6 @@ from app.schemas.complaint import (
 )
 from app.schemas.geo import GeoPoint
 from app.services import codes, geo, storage
-from app.services.pipeline import analyze_media as run_analyze_media
 from app.services.pipeline import run_pipeline
 
 settings = get_settings()
@@ -57,8 +56,6 @@ async def _media_out(db: SessionDep, complaint_id: UUID) -> list[MediaOut]:
             object_key=m.object_key,
             mime=m.mime,
             url=storage.presign_get(m.object_key),
-            cv_status=m.cv_status,
-            cv_result=m.cv_result,
             moderation=m.moderation,
         )
         for m in rows
@@ -260,7 +257,6 @@ async def confirm_media(
     body: MediaConfirmIn,
     user: CitizenUser,
     db: SessionDep,
-    background: BackgroundTasks,
 ) -> MediaOut:
     await _load_for_user(db, complaint_id, user)
     if not body.object_key.startswith(f"complaints/{complaint_id}/"):
@@ -294,15 +290,10 @@ async def confirm_media(
     await db.commit()
     await db.refresh(media)
 
-    # Run computer vision off the request path (FastAPI BackgroundTasks).
-    background.add_task(run_analyze_media, str(media.id))
-
     return MediaOut(
         id=media.id,
         object_key=media.object_key,
         mime=media.mime,
         url=storage.presign_get(media.object_key),
-        cv_status=media.cv_status,
-        cv_result=media.cv_result,
         moderation=media.moderation,
     )

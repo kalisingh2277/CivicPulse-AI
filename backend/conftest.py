@@ -13,4 +13,3 @@ def _deterministic_pipeline() -> None:
         return None
 
     complaints_api.run_pipeline = _noop
-    complaints_api.run_analyze_media = _noop
