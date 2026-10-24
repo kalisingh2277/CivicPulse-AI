@@ -3,8 +3,7 @@ provider directly. Two providers: 'mock' (deterministic, offline, no key) and
 'gemini' (Flash via REST). Any Gemini error falls back to mock behavior — a bad
 key, quota, or demo-day wifi outage must never break the pipeline.
 
-Rules: the LLM never receives PII it doesn't need, and (for reports, later) never
-invents numbers — it only narrates figures we compute and pass in.
+Rule: the LLM never receives PII it doesn't need.
 """
 
 import json
@@ -64,34 +63,6 @@ async def classify(description: str, categories: list[tuple[int, str]]) -> tuple
         except (TypeError, ValueError):
             return None
     return None
-
-
-async def hypothesize_causes(stats: dict) -> str:
-    """A short, clearly-labeled root-cause HYPOTHESIS from cluster stats. The LLM only
-    narrates numbers we pass in — it never invents figures. Mock/fallback builds a
-    deterministic sentence so this works offline."""
-    ward = stats.get("ward_name", "this ward")
-    top = stats.get("top_category", "issues")
-    ratio = stats.get("ratio", 1.0)
-    recent = stats.get("recent_per_week", 0)
-    fallback = (
-        f"{ward} shows about a {ratio:.1f}x rise in '{top}' reports "
-        f"(~{recent:.0f}/week recently vs its prior baseline). Likely drivers to check: "
-        f"localized infrastructure stress, recent weather, or a single recurring source. "
-        f"This is an AI hypothesis — verify on the ground before acting."
-    )
-    if not _use_gemini():
-        return fallback
-    prompt = (
-        "You are assisting a city official. Given these ward statistics, write a 2-3 "
-        "sentence root-cause HYPOTHESIS (label it as a hypothesis, do not invent numbers "
-        "beyond those given).\n"
-        f"Stats: {json.dumps(stats)}"
-    )
-    result = await _generate_json(prompt + '\n\nRespond as JSON: {"hypothesis": "<text>"}')
-    if result and result.get("hypothesis"):
-        return str(result["hypothesis"])
-    return fallback
 
 
 async def title(description: str, category_name: str, address: str | None) -> str:

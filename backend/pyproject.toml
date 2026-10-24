@@ -21,7 +21,6 @@ dependencies = [
     "boto3>=1.35",
     "fastembed>=0.4",
     "langdetect>=1.0.9",
-    "statsmodels>=0.14",
 ]
 
 [dependency-groups]
