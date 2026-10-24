@@ -22,6 +22,5 @@ class DailyStat(Base):
     new_issues: Mapped[int] = mapped_column(Integer, server_default="0")
     resolved_issues: Mapped[int] = mapped_column(Integer, server_default="0")
     reopened_issues: Mapped[int] = mapped_column(Integer, server_default="0")
-    sla_breaches: Mapped[int] = mapped_column(Integer, server_default="0")
     upvotes: Mapped[int] = mapped_column(Integer, server_default="0")
     avg_resolution_hours: Mapped[float | None] = mapped_column(REAL)

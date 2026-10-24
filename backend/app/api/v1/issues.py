@@ -63,8 +63,6 @@ def _to_list_item(issue: Issue, assignee_name: str | None) -> IssueListItem:
         department_id=issue.department_id,
         ward_id=issue.ward_id,
         complaint_count=issue.complaint_count,
-        sla_due_at=issue.sla_due_at,
-        sla_breached=issue.sla_breached,
         assigned_to=issue.assigned_to,
         assigned_to_name=assignee_name,
         created_at=issue.created_at,
@@ -78,7 +76,6 @@ async def list_issues(
     status_filter: Annotated[IssueStatus | None, Query(alias="status")] = None,
     ward_id: int | None = None,
     category_id: int | None = None,
-    sla_breached: bool | None = None,
     assigned_to_me: bool = False,
     q: str | None = None,
     sort: str = "priority",
@@ -93,8 +90,6 @@ async def list_issues(
         stmt = stmt.where(Issue.ward_id == ward_id)
     if category_id is not None:
         stmt = stmt.where(Issue.category_id == category_id)
-    if sla_breached is not None:
-        stmt = stmt.where(Issue.sla_breached == sla_breached)
     if assigned_to_me:
         stmt = stmt.where(Issue.assigned_to == user.id)
     if q:

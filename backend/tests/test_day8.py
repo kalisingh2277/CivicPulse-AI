@@ -8,7 +8,6 @@ from app.core.db import session_factory
 from app.core.redis import redis_client
 from app.main import app
 from app.models.complaint import Complaint
-from app.models.issue import Issue
 from app.services.otp import _key
 from app.services.pipeline import run_pipeline
 
@@ -100,37 +99,3 @@ async def test_citizen_can_confirm_and_reopen() -> None:
         )
         assert confirm.status_code == 200
         assert confirm.json()["status"] == "closed"
-
-
-async def test_sla_scan_flags_overdue() -> None:
-    async with _client() as client:
-        token = await _citizen(client)
-        cid = await _file_and_process(client, token, "Overdue issue for SLA scan")
-        async with session_factory() as db:
-            complaint = await db.get(Complaint, cid)
-            await db.execute(
-                text(
-                    "UPDATE issues SET sla_due_at = now() - interval '2 days', "
-                    "sla_breached=false, status='open' WHERE id=:i"
-                ),
-                {"i": complaint.issue_id},
-            )
-            await db.commit()
-
-        admin = await _admin(client)
-        scan = await client.post("/api/v1/admin/jobs/scan-sla", headers=_auth(admin))
-        assert scan.status_code == 200
-        assert scan.json()["breached"] >= 1
-
-        async with session_factory() as db:
-            complaint = await db.get(Complaint, cid)
-            issue = await db.get(Issue, complaint.issue_id)
-            assert issue.sla_breached is True
-
-
-async def test_day8_rbac() -> None:
-    async with _client() as client:
-        token = await _citizen(client)
-        assert (
-            await client.post("/api/v1/admin/jobs/scan-sla", headers=_auth(token))
-        ).status_code == 403

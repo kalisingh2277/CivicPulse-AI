@@ -7,7 +7,7 @@ Model:
   - One injected HOTSPOT ward where potholes ramp up over the last ~10 weeks
     (so emerging-hotspot detection and forecasting have a signal to find).
   - Issues age realistically: older ones mostly resolved/closed (with resolution
-    times), recent ones in progress; SLA breaches derived from due vs resolved.
+    times), recent ones in progress.
 
 Bypasses the AI pipeline on purpose (no embeddings) — analytics reads aggregates,
 not vectors, and this keeps generation fast.
@@ -41,6 +41,7 @@ MONSOON_CATEGORIES = {"Waterlogging / flooding", "Water pipe leakage", "No water
 MONSOON_LAMBDA = 0.25  # water categories surge in monsoon (absolute daily rate)
 HOTSPOT_CATEGORY = "Pothole"
 HOTSPOT_SURGE_DAYS = 21  # the hotspot ward spikes over the last 3 weeks
+RESOLUTION_MAX_HOURS = 240  # resolved issues take 6h..10d (category-independent)
 HOTSPOT_LAMBDA = 0.8  # ~11 pothole reports in 14 days vs a near-zero baseline
 
 DESC = {
@@ -137,13 +138,12 @@ async def main() -> None:
                         seq += 1
                         lng = w["lng"] + random.uniform(-0.004, 0.004)
                         lat = w["lat"] + random.uniform(-0.004, 0.004)
-                        sla_due = day_dt + timedelta(hours=cat.sla_hours)
 
                         resolved_at = None
                         if age_days > 21 and random.random() < 0.82:
                             status = random.choice(["closed", "closed", "resolved"])
                             resolved_at = day_dt + timedelta(
-                                hours=random.uniform(6, cat.sla_hours * 1.6)
+                                hours=random.uniform(6, RESOLUTION_MAX_HOURS)
                             )
                         elif age_days > 3:
                             status = random.choice(
@@ -151,12 +151,6 @@ async def main() -> None:
                             )
                         else:
                             status = "open"
-
-                        now = datetime.now(UTC)
-                        if resolved_at is not None:
-                            breached = resolved_at > sla_due
-                        else:
-                            breached = now > sla_due
 
                         issue_id = uuid4()
                         issue_rows.append(
@@ -172,8 +166,6 @@ async def main() -> None:
                                 "status": status,
                                 "priority": round(random.uniform(10, 90), 1),
                                 "first": day_dt,
-                                "sla_due": sla_due,
-                                "breached": breached,
                                 "resolved_at": resolved_at,
                             }
                         )
@@ -206,10 +198,10 @@ _ISSUE_SQL = text(
     """
     INSERT INTO issues (id, public_code, title, category_id, department_id, ward_id,
         centroid, status, priority_score, complaint_count, first_reported_at,
-        sla_due_at, sla_breached, resolved_at, created_at, updated_at)
+        resolved_at, created_at, updated_at)
     VALUES (:id, :public_code, :title, :category_id, :department_id, :ward_id,
         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, CAST(:status AS issue_status),
-        :priority, 1, :first, :sla_due, :breached, :resolved_at, :first, :first)
+        :priority, 1, :first, :resolved_at, :first, :first)
     """
 )
 

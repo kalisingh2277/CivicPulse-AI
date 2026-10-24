@@ -74,6 +74,5 @@ Sync `./backups` to R2/S3 for offsite durability.
 
 ## Operations
 - Logs: `docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api` (structured JSON in prod).
-- SLA scan runs via the worker; trigger manually from the admin **Reports** page.
 - Health: `GET /api/v1/health` returns DB + Redis + extension status.
 - The app refuses to boot in prod with the default JWT secret — set a real one.

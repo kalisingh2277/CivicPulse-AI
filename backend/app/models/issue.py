@@ -5,7 +5,6 @@ from uuid import UUID
 from geoalchemy2 import Geography
 from sqlalchemy import (
     REAL,
-    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -45,8 +44,6 @@ class Issue(Base):
     complaint_count: Mapped[int] = mapped_column(Integer, server_default="0")
     upvote_count: Mapped[int] = mapped_column(Integer, server_default="0")
     first_reported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    sla_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    sla_breached: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     assigned_to: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolution_note: Mapped[str | None] = mapped_column(Text)

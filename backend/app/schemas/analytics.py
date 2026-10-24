@@ -18,7 +18,6 @@ class DepartmentRow(BaseModel):
     name: str
     open_count: int
     total: int
-    sla_breach_pct: float
     reopened_pct: float
     median_resolution_hours: float | None
 

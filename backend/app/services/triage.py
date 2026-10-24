@@ -1,4 +1,3 @@
-from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import text
@@ -53,7 +52,6 @@ async def create_issue_from_complaint(
         centroid=geo.point(coords[0], coords[1]),  # reporter's point as the issue centroid
         status=IssueStatus.open,
         first_reported_at=complaint.created_at,
-        sla_due_at=complaint.created_at + timedelta(hours=category.sla_hours),
         complaint_count=1,
     )
     db.add(issue)

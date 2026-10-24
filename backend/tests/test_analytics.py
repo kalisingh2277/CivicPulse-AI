@@ -80,7 +80,7 @@ async def test_rebuild_and_dashboards() -> None:
 
         depts = await client.get("/api/v1/analytics/departments", headers=_auth(admin))
         assert depts.status_code == 200 and len(depts.json()) == 7
-        assert "sla_breach_pct" in depts.json()[0]
+        assert "reopened_pct" in depts.json()[0]
 
 
 async def test_public_endpoints_need_no_auth_and_hide_pii() -> None:
