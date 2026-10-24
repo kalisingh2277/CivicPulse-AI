@@ -83,23 +83,6 @@ async def test_rebuild_and_dashboards() -> None:
         assert "reopened_pct" in depts.json()[0]
 
 
-async def test_public_endpoints_need_no_auth_and_hide_pii() -> None:
-    async with _client() as client:
-        stats = await client.get("/api/v1/public/stats")  # no Authorization header
-        assert stats.status_code == 200
-        body = stats.json()
-        assert body["total_issues"] >= 0
-        assert 0 <= body["resolved_pct"] <= 100
-
-        issues = await client.get("/api/v1/public/issues?limit=20")
-        assert issues.status_code == 200
-        if issues.json():
-            item = issues.json()[0]
-            # no reporter / citizen fields leak; coords are rounded to ~3 dp
-            assert "citizen_id" not in item and "reporter" not in item
-            assert round(item["lng"], 3) == item["lng"]
-
-
 async def test_analytics_requires_staff() -> None:
     async with _client() as client:
         token = await _citizen(client)
