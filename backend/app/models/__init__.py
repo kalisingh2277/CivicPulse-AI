@@ -9,12 +9,10 @@ from app.models.enums import (
     CvStatus,
     IssueStatus,
     ModerationStatus,
-    NotificationChannel,
     ProcessingStatus,
     UserRole,
 )
 from app.models.issue import Issue
-from app.models.notification import Notification
 from app.models.org import Category, Department, Ward
 from app.models.report import Report
 from app.models.user import OfficialWard, Session, User
@@ -26,7 +24,6 @@ __all__ = [
     "IssueStatus",
     "CvStatus",
     "ModerationStatus",
-    "NotificationChannel",
     "CorrectionKind",
     "AiJobStatus",
     "Category",
@@ -40,7 +37,6 @@ __all__ = [
     "ComplaintMedia",
     "IssueStatusHistory",
     "IssueUpdate",
-    "Notification",
     "AiJob",
     "Correction",
     "IssueUpvote",

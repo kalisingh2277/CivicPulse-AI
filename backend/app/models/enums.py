@@ -39,11 +39,6 @@ class ModerationStatus(enum.StrEnum):
     flagged = "flagged"
 
 
-class NotificationChannel(enum.StrEnum):
-    inapp = "inapp"
-    email = "email"
-
-
 class CorrectionKind(enum.StrEnum):
     recategorize = "recategorize"
     detach = "detach"

@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit import IssueStatusHistory
 from app.models.enums import IssueStatus
 from app.models.issue import Issue
-from app.services import notifications
 
 # The issue state machine (docs/02-user-flows.md F5). Keys = current status,
 # values = allowed next statuses. Anything not listed is rejected server-side.
@@ -61,13 +60,6 @@ async def transition(
             actor_id=actor_id,
             note=note,
         )
-    )
-    await notifications.notify_issue_citizens(
-        db,
-        issue.id,
-        kind="status_change",
-        title=f"Update on {issue.public_code}",
-        body=f"Status changed from {frm} to {to_status}.",
     )
 
 
