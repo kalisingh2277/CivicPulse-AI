@@ -180,28 +180,9 @@ async def test_sla_scan_flags_overdue() -> None:
             assert issue.sla_breached is True
 
 
-async def test_weekly_report_generation() -> None:
-    async with _client() as client:
-        admin = await _admin(client)
-        gen = await client.post("/api/v1/reports/generate", headers=_auth(admin))
-        assert gen.status_code == 201
-        body = gen.json()
-        assert body["content_md"] and len(body["content_md"]) > 0
-        assert "new_issues" in body["stats"]
-
-        listed = await client.get("/api/v1/reports", headers=_auth(admin))
-        assert any(r["id"] == body["id"] for r in listed.json())
-
-        detail = await client.get(f"/api/v1/reports/{body['id']}", headers=_auth(admin))
-        assert detail.json()["content_md"] == body["content_md"]
-
-
 async def test_day8_rbac() -> None:
     async with _client() as client:
         token = await _citizen(client)
         assert (
             await client.post("/api/v1/admin/jobs/scan-sla", headers=_auth(token))
-        ).status_code == 403
-        assert (
-            await client.post("/api/v1/reports/generate", headers=_auth(token))
         ).status_code == 403

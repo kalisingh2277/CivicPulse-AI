@@ -94,32 +94,6 @@ async def hypothesize_causes(stats: dict) -> str:
     return fallback
 
 
-async def narrate_report(stats: dict) -> str:
-    """Narrate a weekly report in Markdown. Critically: the model is GIVEN the
-    numbers and only describes them — every figure in the prose traces to `stats`."""
-    fallback = (
-        f"## Weekly civic report ({stats.get('period_start')} → {stats.get('period_end')})\n\n"
-        f"- **New issues:** {stats.get('new_issues', 0)}\n"
-        f"- **Resolved:** {stats.get('resolved_issues', 0)} "
-        f"({stats.get('resolved_pct', 0)}% of new)\n"
-        f"- **SLA breaches:** {stats.get('sla_breaches', 0)}\n"
-        f"- **Busiest category:** {stats.get('top_category', 'n/a')}\n"
-        f"- **Emerging hotspots:** {stats.get('emerging_hotspots', 0)}\n\n"
-        "_Generated from the figures above; review before circulating._"
-    )
-    if not _use_gemini():
-        return fallback
-    prompt = (
-        "Write a concise weekly civic-governance report in Markdown for city leadership. "
-        "Use ONLY these figures, do not invent any numbers:\n"
-        f"{json.dumps(stats)}"
-    )
-    result = await _generate_json(prompt + '\n\nRespond as JSON: {"markdown": "<md>"}')
-    if result and result.get("markdown"):
-        return str(result["markdown"])
-    return fallback
-
-
 async def title(description: str, category_name: str, address: str | None) -> str:
     """A short issue title. Mock/fallback uses a clean template; Gemini sharpens it."""
     fallback = f"{category_name} near {address or 'reported location'}"

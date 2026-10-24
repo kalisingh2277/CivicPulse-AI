@@ -9,7 +9,6 @@ from app.api.v1 import (
     health,
     issues,
     public,
-    reports,
     triage,
     wards,
 )
@@ -22,7 +21,6 @@ api_router.include_router(issues.router)
 api_router.include_router(triage.router)
 api_router.include_router(categories.router)
 api_router.include_router(analytics.router)
-api_router.include_router(reports.router)
 api_router.include_router(public.router)
 api_router.include_router(wards.router)
 api_router.include_router(admin.router)

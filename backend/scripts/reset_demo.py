@@ -17,7 +17,7 @@ from scripts import generate_synthetic
 
 _TRUNCATE = """
 TRUNCATE complaints, issues, complaint_media, issue_status_history, issue_updates,
-         issue_upvotes, ai_jobs, corrections, reports, daily_stats
+         issue_upvotes, ai_jobs, corrections, daily_stats
 RESTART IDENTITY CASCADE
 """
 
