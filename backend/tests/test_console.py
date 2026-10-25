@@ -164,15 +164,11 @@ async def test_triage_to_resolution_lifecycle_and_citizen_tracking() -> None:
         statuses = [e["to_status"] for e in timeline.json() if e["kind"] == "status"]
         assert statuses == ["open", "acknowledged", "assigned", "in_progress", "resolved"]
 
-        # citizen now sees the issue status on their complaint, and got notified
+        # citizen now sees the issue status on their complaint
         mine = await client.get("/api/v1/complaints/mine", headers=_auth(citizen))
         tracked = mine.json()[0]
         assert tracked["issue_status"] == "resolved"
         assert tracked["issue_public_code"].startswith("ISS-")
-
-        notes = await client.get("/api/v1/notifications", headers=_auth(citizen))
-        assert len(notes.json()) >= 1
-        assert any(n["kind"] == "status_change" for n in notes.json())
 
 
 async def test_citizen_cannot_access_console() -> None:

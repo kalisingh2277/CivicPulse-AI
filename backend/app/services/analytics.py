@@ -43,16 +43,6 @@ _REBUILD_STEPS = [
     DO UPDATE SET resolved_issues = EXCLUDED.resolved_issues,
                   avg_resolution_hours = EXCLUDED.avg_resolution_hours
     """,
-    # SLA breaches (keyed by first report date)
-    """
-    INSERT INTO daily_stats (day, ward_id, category_id, sla_breaches)
-    SELECT first_reported_at::date, ward_id, category_id, count(*)
-    FROM issues
-    WHERE sla_breached
-    GROUP BY 1, 2, 3
-    ON CONFLICT (day, ward_id, category_id)
-    DO UPDATE SET sla_breaches = EXCLUDED.sla_breaches
-    """,
     # upvotes
     """
     INSERT INTO daily_stats (day, ward_id, category_id, upvotes)
@@ -147,7 +137,6 @@ async def department_performance(db: AsyncSession) -> list[dict[str, Any]]:
                   count(i.id) FILTER (
                       WHERE i.status NOT IN ('resolved','closed','rejected')
                   ) AS open_count,
-                  count(i.id) FILTER (WHERE i.sla_breached) AS breached,
                   count(i.id) FILTER (WHERE i.reopen_count > 0) AS reopened,
                   percentile_cont(0.5) WITHIN GROUP (
                       ORDER BY EXTRACT(EPOCH FROM (i.resolved_at - i.first_reported_at)) / 3600
@@ -169,7 +158,6 @@ async def department_performance(db: AsyncSession) -> list[dict[str, Any]]:
                 "name": r["name"],
                 "open_count": int(r["open_count"] or 0),
                 "total": total,
-                "sla_breach_pct": round(100 * (r["breached"] or 0) / total, 1) if total else 0.0,
                 "reopened_pct": round(100 * (r["reopened"] or 0) / total, 1) if total else 0.0,
                 "median_resolution_hours": round(float(r["median_hours"]), 1)
                 if r["median_hours"] is not None
@@ -177,47 +165,3 @@ async def department_performance(db: AsyncSession) -> list[dict[str, Any]]:
             }
         )
     return out
-
-
-async def public_stats(db: AsyncSession) -> dict[str, Any]:
-    """City-wide, fully anonymized counters for the public dashboard."""
-    row = (
-        (
-            await db.execute(
-                text(
-                    """
-                SELECT
-                  count(*) AS total_issues,
-                  count(*) FILTER (WHERE status IN ('resolved','closed')) AS resolved,
-                  count(*) FILTER (
-                      WHERE status NOT IN ('resolved','closed','rejected')
-                  ) AS open_issues
-                FROM issues
-                """
-                )
-            )
-        )
-        .mappings()
-        .one()
-    )
-    by_category = (
-        await db.execute(
-            text(
-                """
-                SELECT c.name, count(i.id) AS n
-                FROM categories c LEFT JOIN issues i ON i.category_id = c.id
-                GROUP BY c.name HAVING count(i.id) > 0
-                ORDER BY n DESC LIMIT 8
-                """
-            )
-        )
-    ).mappings()
-    total = int(row["total_issues"] or 0)
-    resolved = int(row["resolved"] or 0)
-    return {
-        "total_issues": total,
-        "open_issues": int(row["open_issues"] or 0),
-        "resolved_issues": resolved,
-        "resolved_pct": round(100 * resolved / total, 1) if total else 0.0,
-        "top_categories": [{"name": r["name"], "count": int(r["n"])} for r in by_category],
-    }

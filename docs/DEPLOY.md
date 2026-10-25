@@ -4,7 +4,7 @@ Everything ships as containers behind one Caddy origin (so the auth cookie works
 and you get automatic HTTPS). There are three ways to run it.
 
 ## 0. Prereqs
-Docker + Docker Compose. That's it — Postgres, Redis, MinIO, the API, the worker,
+Docker + Docker Compose. That's it — Postgres, Redis, MinIO, the API,
 the frontend, and Caddy all run as containers.
 
 ```powershell
@@ -27,7 +27,7 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm api .ven
 docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm api .venv/bin/python -m scripts.generate_synthetic
 ```
 Open https://localhost (accept the local cert). Migrations run automatically (the
-`migrate` service); the worker processes the AI pipeline.
+`migrate` service); the API runs the AI pipeline in-process as a background task.
 
 ## 2. Share with a friend — Cloudflare quick tunnel (no account, no AWS)
 Run the local prod stack with `SITE_ADDRESS=:80` and start a tunnel to Caddy:
@@ -73,7 +73,6 @@ for Cloudflare R2 / S3 (set the S3_* + endpoint envs) — no app changes.
 Sync `./backups` to R2/S3 for offsite durability.
 
 ## Operations
-- Logs: `docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api worker` (structured JSON in prod).
-- SLA scan runs via the worker; trigger manually from the admin **Reports** page.
+- Logs: `docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api` (structured JSON in prod).
 - Health: `GET /api/v1/health` returns DB + Redis + extension status.
 - The app refuses to boot in prod with the default JWT secret — set a real one.

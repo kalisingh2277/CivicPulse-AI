@@ -17,8 +17,6 @@ class IssueListItem(BaseModel):
     department_id: int
     ward_id: int
     complaint_count: int
-    sla_due_at: datetime
-    sla_breached: bool
     assigned_to: UUID | None
     assigned_to_name: str | None
     created_at: datetime

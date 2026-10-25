@@ -7,7 +7,7 @@ from app.models.base import Base
 
 
 class DailyStat(Base):
-    """Pre-aggregated daily counts per ward x category. Dashboards and forecasting
+    """Pre-aggregated daily counts per ward x category. Dashboards
     read ONLY this table — never a raw scan of complaints/issues (the #1 dashboard
     performance lesson). Rebuilt nightly (and after the synthetic seed)."""
 
@@ -22,6 +22,5 @@ class DailyStat(Base):
     new_issues: Mapped[int] = mapped_column(Integer, server_default="0")
     resolved_issues: Mapped[int] = mapped_column(Integer, server_default="0")
     reopened_issues: Mapped[int] = mapped_column(Integer, server_default="0")
-    sla_breaches: Mapped[int] = mapped_column(Integer, server_default="0")
     upvotes: Mapped[int] = mapped_column(Integer, server_default="0")
     avg_resolution_hours: Mapped[float | None] = mapped_column(REAL)

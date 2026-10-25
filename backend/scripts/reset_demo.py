@@ -1,9 +1,9 @@
 """Reset to a clean, coherent demo state.
 
 Clears all transactional data + citizen accounts (test cruft accumulates during
-development and muddies the hotspot/forecast story), keeps reference data and staff
+development and muddies the demo story), keeps reference data and staff
 accounts, then regenerates the synthetic history so the planted signals — the
-monsoon water spike and the ward-1 pothole hotspot — are the clear story.
+monsoon water spike and the ward-1 pothole surge — are the clear story.
 
 Run from backend/:  uv run python -m scripts.reset_demo
 """
@@ -17,7 +17,7 @@ from scripts import generate_synthetic
 
 _TRUNCATE = """
 TRUNCATE complaints, issues, complaint_media, issue_status_history, issue_updates,
-         issue_upvotes, notifications, ai_jobs, corrections, reports, daily_stats
+         issue_upvotes, ai_jobs, corrections, daily_stats
 RESTART IDENTITY CASCADE
 """
 

@@ -1,4 +1,4 @@
-# CivicPulse AI — Predictive Urban Governance Platform
+# CivicPulse AI — Civic Complaint Intelligence Platform
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
@@ -7,7 +7,7 @@
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-PostGIS%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-47%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-37%20passing-brightgreen">
 </p>
 
 Most civic complaint systems are reactive and complaint-centric: fifty residents
@@ -19,7 +19,7 @@ reports into a prioritized work queue and city-level intelligence:
 
 ```
 many COMPLAINTS  →  deduplicated ISSUES  →  prioritized WORK QUEUES  →  city INTELLIGENCE
-  (citizen)         (NLP + geospatial)       (scoring · SLA · routing)   (trends · hotspots · forecasts)
+  (citizen)         (NLP + geospatial)       (scoring · routing)           (heatmap · trends)
 ```
 
 The one load-bearing idea: an **Issue** (the real-world problem) is a first-class
@@ -39,18 +39,8 @@ Pilot city: **Bengaluru** (real BBMP ward boundaries).
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/03-predictive.png" alt="Predictive governance"><br>
-      <sub><b>Predictive governance</b> — emerging hotspots + SARIMA forecast with confidence band.</sub>
-    </td>
-    <td width="50%" valign="top">
       <img src="docs/screenshots/02-console-triage.png" alt="Official console"><br>
-      <sub><b>Official console</b> — deduplicated, priority-scored issue queue with SLA badges.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/screenshots/01-public-dashboard.png" alt="Public transparency dashboard"><br>
-      <sub><b>Public dashboard</b> — anonymized, no-login city transparency view.</sub>
+      <sub><b>Official console</b> — deduplicated, priority-scored issue queue.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/06-report-map.png" alt="Citizen report"><br>
@@ -64,19 +54,17 @@ Pilot city: **Bengaluru** (real BBMP ward boundaries).
 ## What it does (all live)
 
 **Citizens** — sign up (email OTP), report in any language with a map pin + photo, get
-a **pre-submit duplicate intercept** ("this is already reported — notify me too (+1)"),
+a **pre-submit duplicate intercept** ("this is already reported — count me in too (+1)"),
 track issues, and confirm/reopen resolutions.
 
 **AI pipeline** — language detect → multilingual embedding → zero-shot
 categorization → **duplicate detection** (pgvector + PostGIS in one query) →
-auto-attach or create issue → transparent priority score → computer-vision photo
-analysis. Runs off the request path; fully offline in `MOCK_AI` mode.
+auto-attach or create issue → transparent priority score. Runs off the request
+path as a FastAPI background task; fully offline in `MOCK_AI` mode.
 
 **Officials / admins** — a deduplicated, prioritized triage queue; issue lifecycle
-with audit trail, assignment, SLAs; **analytics** (heatmap, trends, department
-performance); **predictive governance** (emerging hotspots, SARIMA forecasts with
-confidence intervals, ward risk scores, LLM root-cause hypotheses); weekly AI
-reports; a public, anonymized transparency dashboard.
+with audit trail and assignment; **analytics** (heatmap, trends, department
+performance).
 
 ## AI — honest numbers
 
@@ -89,32 +77,28 @@ Measured on a hand-labeled eval set with the same model the app uses
 | Duplicate detection — auto-merge | **precision 1.00**, recall 0.69 @ 0.65 | no-human merge → precision-first |
 | Duplicate detection — intercept | precision 0.83, recall 0.77 @ 0.60 | human decides → recall-favored |
 | Category top-1 (zero-shot) | 0.77 | misses are mostly Hindi/Hinglish; officials correct → labeled flywheel |
-| Forecasting | SARIMA + 80% CI | trend only (≈14 mo data ≠ annual seasonality) — stated, not oversold |
-| Photo CV | Gemini Vision zero-shot | verifies/enriches, never gates; YOLO fine-tune is a post-MVP stretch |
 
 The thresholds above were **calibrated from the eval set, not guessed** — the naive
 0.78/0.88 gave auto-merge recall 0.0. See [ml/eval/README.md](ml/eval/README.md).
 
 ## Architecture
 
-Two backend deployables (a slim `api` and an `ai` worker, decoupled by a Redis
-queue), Postgres doing triple duty (relational + PostGIS geospatial + pgvector
+A single FastAPI backend (the AI pipeline runs in-process as a background task),
+Postgres doing triple duty (relational + PostGIS geospatial + pgvector
 similarity — which is why dedup is one SQL statement and FAISS isn't needed), and a
-Next.js frontend. One real service boundary, not ten nano-services — drawn where the
-dependency weight and scaling profile actually differ.
+Next.js frontend. One service, not ten nano-services.
 
 ```
-Next.js ──REST──> FastAPI api ──enqueue──> Redis ──> arq worker ──> Gemini (adapter+mock)
-                       │                                   │
-                       └──────────> PostgreSQL (PostGIS + pgvector) <──┘
+Next.js ──REST──> FastAPI api ──(background task)──> Gemini (adapter+mock)
+                       │
+                       └──────────> PostgreSQL (PostGIS + pgvector)       Redis (OTP, rate limits)
    browser ──presigned PUT/GET──> MinIO / R2 (photos)
 ```
 
 Stack: **Next.js 16 · Tailwind · FastAPI · PostgreSQL 16 (PostGIS + pgvector) ·
-Redis + arq · MinIO/R2 · fastembed (ONNX) · statsmodels · Gemini Flash · Docker · Caddy.**
+Redis · MinIO/R2 · fastembed (ONNX) · Gemini Flash · Docker · Caddy.**
 
-The "why" behind every choice (pgvector over FAISS, modular monolith, arq over
-Celery, classical forecasting, …) is recorded as ADRs in
+The "why" behind every choice (pgvector over FAISS, modular monolith, …) is recorded as ADRs in
 [docs/05-architecture.md](docs/05-architecture.md). Full planning set —
 PRD, user flows, DB schema, API contracts, build plan — in [docs/](docs/README.md).
 
@@ -167,14 +151,14 @@ uv run pytest -m "not integration"   # unit (CI)
 uv run pytest                        # + integration (needs docker compose up)
 uv run ruff check . ; uv run ruff format --check .
 ```
-47 backend tests; CI runs ruff + pytest + the frontend production build.
+37 backend tests; CI runs ruff + pytest + the frontend production build.
 
 ## Repository layout
 
 ```
 docs/        PRD, user flows, DB schema, API contracts, architecture ADRs, deploy guide
-backend/     FastAPI app, arq worker, AI pipeline, Alembic migrations, tests, scripts
-frontend/    Next.js app (citizen portal, official console, admin, public dashboard)
+backend/     FastAPI app, AI pipeline, Alembic migrations, tests, scripts
+frontend/    Next.js app (citizen portal, official console, analytics)
 infra/       Postgres image (PostGIS + pgvector), Caddyfile
 ml/eval/     hand-labeled eval set + offline metrics script
 ```
@@ -182,9 +166,7 @@ ml/eval/     hand-labeled eval set + offline metrics script
 ## Honest limitations
 
 Single-tenant (one city per deployment). Categorization is zero-shot (0.77) with a
-correction flywheel, not a trained classifier yet. Forecasts capture trend, not
-annual seasonality, on this much data. CV is zero-shot (Gemini) — the fine-tuned YOLO
-detector and PDF report export are documented post-MVP work. The eval set is small
+correction flywheel, not a trained classifier yet. The eval set is small
 (indicative, not production-grade). These are deliberate, documented trade-offs — not
 hidden gaps.
 

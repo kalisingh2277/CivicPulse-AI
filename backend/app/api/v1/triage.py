@@ -96,8 +96,6 @@ async def create_issue(
         department_id=issue.department_id,
         ward_id=issue.ward_id,
         complaint_count=issue.complaint_count,
-        sla_due_at=issue.sla_due_at,
-        sla_breached=issue.sla_breached,
         assigned_to=issue.assigned_to,
         assigned_to_name=None,
         created_at=issue.created_at,

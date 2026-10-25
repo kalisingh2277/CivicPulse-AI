@@ -4,7 +4,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     ForeignKey,
-    Integer,
     SmallInteger,
     String,
     Text,
@@ -44,7 +43,6 @@ class Category(Base):
     description: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(384))
     severity_weight: Mapped[int] = mapped_column(SmallInteger, server_default="3")
-    sla_hours: Mapped[int] = mapped_column(Integer, server_default="168")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     __table_args__ = (

@@ -20,8 +20,6 @@ export type IssueListItem = {
   department_id: number;
   ward_id: number;
   complaint_count: number;
-  sla_due_at: string;
-  sla_breached: boolean;
   assigned_to: string | null;
   assigned_to_name: string | null;
   created_at: string;
@@ -67,7 +65,6 @@ export type Category = {
   name: string;
   department_id: number;
   severity_weight: number;
-  sla_hours: number;
 };
 
 export type StaffMember = {
@@ -95,21 +92,7 @@ export type IssueMedia = {
   id: string;
   url: string;
   mime: string;
-  cv_status: string;
-  cv_result: { labels?: { label: string; conf: number }[]; severity?: number } | null;
   moderation: string | null;
-};
-
-export type ReportListItem = {
-  id: string;
-  period_start: string;
-  period_end: string;
-  scope: string;
-  created_at: string;
-};
-export type Report = ReportListItem & {
-  stats: Record<string, unknown>;
-  content_md: string | null;
 };
 
 export const consoleApi = {
@@ -129,8 +112,4 @@ export const consoleApi = {
   createIssue: (complaintId: string, category_id: number, title?: string) =>
     api.post<IssueDetail>(`/triage/${complaintId}/create-issue`, { category_id, title }),
   categories: () => api.get<Category[]>("/categories"),
-  listReports: () => api.get<ReportListItem[]>("/reports"),
-  getReport: (id: string) => api.get<Report>(`/reports/${id}`),
-  generateReport: () => api.post<Report>("/reports/generate"),
-  scanSla: () => api.post<{ breached: number }>("/admin/jobs/scan-sla"),
 };

@@ -58,12 +58,6 @@ export default function Home() {
               </Link>
             </>
           )}
-          <Link
-            href="/public"
-            className="rounded-md border border-neutral-300 bg-white px-5 py-2.5 hover:bg-neutral-100"
-          >
-            View city transparency
-          </Link>
         </div>
       </section>
 
@@ -76,7 +70,7 @@ export default function Home() {
         <Step
           n={2}
           title="AI triages"
-          body="Multilingual dedup, auto-categorization, photo analysis, and priority — in seconds."
+          body="Multilingual dedup, auto-categorization, and priority — in seconds."
         />
         <Step
           n={3}
@@ -97,13 +91,13 @@ export default function Home() {
           <div>
             <p className="font-medium">Officials</p>
             <p className="mt-1 text-neutral-500">
-              A prioritized, deduplicated queue with audit trails and SLAs.
+              A prioritized, deduplicated queue with audit trails.
             </p>
           </div>
           <div>
             <p className="font-medium">Administrators</p>
             <p className="mt-1 text-neutral-500">
-              Heatmaps, trends, emerging-hotspot forecasts, and weekly reports.
+              Heatmaps, trends, and department performance.
             </p>
           </div>
         </div>

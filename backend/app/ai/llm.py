@@ -3,8 +3,7 @@ provider directly. Two providers: 'mock' (deterministic, offline, no key) and
 'gemini' (Flash via REST). Any Gemini error falls back to mock behavior — a bad
 key, quota, or demo-day wifi outage must never break the pipeline.
 
-Rules: the LLM never receives PII it doesn't need, and (for reports, later) never
-invents numbers — it only narrates figures we compute and pass in.
+Rule: the LLM never receives PII it doesn't need.
 """
 
 import json
@@ -64,60 +63,6 @@ async def classify(description: str, categories: list[tuple[int, str]]) -> tuple
         except (TypeError, ValueError):
             return None
     return None
-
-
-async def hypothesize_causes(stats: dict) -> str:
-    """A short, clearly-labeled root-cause HYPOTHESIS from cluster stats. The LLM only
-    narrates numbers we pass in — it never invents figures. Mock/fallback builds a
-    deterministic sentence so this works offline."""
-    ward = stats.get("ward_name", "this ward")
-    top = stats.get("top_category", "issues")
-    ratio = stats.get("ratio", 1.0)
-    recent = stats.get("recent_per_week", 0)
-    fallback = (
-        f"{ward} shows about a {ratio:.1f}x rise in '{top}' reports "
-        f"(~{recent:.0f}/week recently vs its prior baseline). Likely drivers to check: "
-        f"localized infrastructure stress, recent weather, or a single recurring source. "
-        f"This is an AI hypothesis — verify on the ground before acting."
-    )
-    if not _use_gemini():
-        return fallback
-    prompt = (
-        "You are assisting a city official. Given these ward statistics, write a 2-3 "
-        "sentence root-cause HYPOTHESIS (label it as a hypothesis, do not invent numbers "
-        "beyond those given).\n"
-        f"Stats: {json.dumps(stats)}"
-    )
-    result = await _generate_json(prompt + '\n\nRespond as JSON: {"hypothesis": "<text>"}')
-    if result and result.get("hypothesis"):
-        return str(result["hypothesis"])
-    return fallback
-
-
-async def narrate_report(stats: dict) -> str:
-    """Narrate a weekly report in Markdown. Critically: the model is GIVEN the
-    numbers and only describes them — every figure in the prose traces to `stats`."""
-    fallback = (
-        f"## Weekly civic report ({stats.get('period_start')} → {stats.get('period_end')})\n\n"
-        f"- **New issues:** {stats.get('new_issues', 0)}\n"
-        f"- **Resolved:** {stats.get('resolved_issues', 0)} "
-        f"({stats.get('resolved_pct', 0)}% of new)\n"
-        f"- **SLA breaches:** {stats.get('sla_breaches', 0)}\n"
-        f"- **Busiest category:** {stats.get('top_category', 'n/a')}\n"
-        f"- **Emerging hotspots:** {stats.get('emerging_hotspots', 0)}\n\n"
-        "_Generated from the figures above; review before circulating._"
-    )
-    if not _use_gemini():
-        return fallback
-    prompt = (
-        "Write a concise weekly civic-governance report in Markdown for city leadership. "
-        "Use ONLY these figures, do not invent any numbers:\n"
-        f"{json.dumps(stats)}"
-    )
-    result = await _generate_json(prompt + '\n\nRespond as JSON: {"markdown": "<md>"}')
-    if result and result.get("markdown"):
-        return str(result["markdown"])
-    return fallback
 
 
 async def title(description: str, category_name: str, address: str | None) -> str:

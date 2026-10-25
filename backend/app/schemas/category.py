@@ -6,4 +6,3 @@ class CategoryOut(BaseModel):
     name: str
     department_id: int
     severity_weight: int
-    sla_hours: int

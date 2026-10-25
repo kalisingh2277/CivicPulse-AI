@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from geoalchemy2 import Geography
@@ -16,12 +15,11 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
-from app.models.enums import CvStatus, ModerationStatus, ProcessingStatus
+from app.models.enums import ModerationStatus, ProcessingStatus
 
 
 class Complaint(Base):
@@ -73,11 +71,6 @@ class ComplaintMedia(Base):
     exif_gps: Mapped[object | None] = mapped_column(
         Geography("POINT", srid=4326, spatial_index=False)
     )
-    cv_status: Mapped[CvStatus] = mapped_column(
-        Enum(CvStatus, name="cv_status", values_callable=lambda e: [m.value for m in e]),
-        server_default=text("'pending'"),
-    )
-    cv_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     moderation: Mapped[ModerationStatus] = mapped_column(
         Enum(
             ModerationStatus,

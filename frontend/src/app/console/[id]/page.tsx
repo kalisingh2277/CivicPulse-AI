@@ -116,11 +116,6 @@ export default function IssueDetailPage() {
         <StatusBadge status={issue.status} />
       </div>
 
-      {issue.sla_breached && (
-        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          SLA breached — due {new Date(issue.sla_due_at).toLocaleString()}
-        </p>
-      )}
       {issue.resolution_note && (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
           Resolution: {issue.resolution_note}
@@ -182,10 +177,10 @@ export default function IssueDetailPage() {
         )}
       </section>
 
-      {/* Photos + AI detection */}
+      {/* Photos */}
       {media.length > 0 && (
         <section className="mt-6">
-          <h2 className="mb-2 text-sm font-medium">Photos &amp; AI detection</h2>
+          <h2 className="mb-2 text-sm font-medium">Photos</h2>
           <div className="flex flex-wrap gap-3">
             {media.map((m) => (
               <div key={m.id} className="w-40">
@@ -196,21 +191,10 @@ export default function IssueDetailPage() {
                   className="h-28 w-40 rounded-md border border-neutral-200 object-cover"
                 />
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {m.cv_result?.labels?.map((l, i) => (
-                    <span
-                      key={i}
-                      className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-800"
-                    >
-                      {l.label} {Math.round(l.conf * 100)}%
-                    </span>
-                  ))}
                   {m.moderation === "flagged" && (
                     <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">
                       flagged
                     </span>
-                  )}
-                  {m.cv_status === "pending" && (
-                    <span className="text-xs text-neutral-400">analyzing…</span>
                   )}
                 </div>
               </div>

@@ -26,22 +26,10 @@ class IssueStatus(enum.StrEnum):
     rejected = "rejected"
 
 
-class CvStatus(enum.StrEnum):
-    pending = "pending"
-    done = "done"
-    failed = "failed"
-    skipped = "skipped"
-
-
 class ModerationStatus(enum.StrEnum):
     pending = "pending"
     approved = "approved"
     flagged = "flagged"
-
-
-class NotificationChannel(enum.StrEnum):
-    inapp = "inapp"
-    email = "email"
 
 
 class CorrectionKind(enum.StrEnum):

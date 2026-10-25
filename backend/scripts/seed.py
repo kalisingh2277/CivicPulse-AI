@@ -29,23 +29,23 @@ WARD_GEOJSON = Path(__file__).resolve().parent.parent / "data" / "bbmp_wards_raw
 
 DEPARTMENTS = ["Roads", "Sanitation", "Water", "Electrical", "Parks", "Enforcement", "Health"]
 
-# (name, department, severity_weight, sla_hours) — from docs/03-database-schema.md
+# (name, department, severity_weight) — from docs/03-database-schema.md
 CATEGORIES = [
-    ("Pothole", "Roads", 4, 72),
-    ("Road cracking / damage", "Roads", 3, 168),
-    ("Broken footpath", "Roads", 2, 240),
-    ("Garbage dump / missed pickup", "Sanitation", 3, 48),
-    ("Dead animal", "Sanitation", 4, 24),
-    ("Public toilet unclean", "Sanitation", 2, 72),
-    ("Water pipe leakage", "Water", 4, 24),
-    ("Waterlogging / flooding", "Water", 5, 24),
-    ("No water supply", "Water", 4, 48),
-    ("Streetlight not working", "Electrical", 3, 96),
-    ("Dangling wires", "Electrical", 5, 24),
-    ("Fallen tree / branches", "Parks", 4, 48),
-    ("Park maintenance", "Parks", 1, 336),
-    ("Illegal construction debris", "Enforcement", 2, 168),
-    ("Stray animal menace", "Health", 3, 96),
+    ("Pothole", "Roads", 4),
+    ("Road cracking / damage", "Roads", 3),
+    ("Broken footpath", "Roads", 2),
+    ("Garbage dump / missed pickup", "Sanitation", 3),
+    ("Dead animal", "Sanitation", 4),
+    ("Public toilet unclean", "Sanitation", 2),
+    ("Water pipe leakage", "Water", 4),
+    ("Waterlogging / flooding", "Water", 5),
+    ("No water supply", "Water", 4),
+    ("Streetlight not working", "Electrical", 3),
+    ("Dangling wires", "Electrical", 5),
+    ("Fallen tree / branches", "Parks", 4),
+    ("Park maintenance", "Parks", 1),
+    ("Illegal construction debris", "Enforcement", 2),
+    ("Stray animal menace", "Health", 3),
 ]
 
 # Human-readable descriptions used both for officials and (Day 5) to build the
@@ -87,7 +87,7 @@ async def seed_departments(session) -> dict[str, int]:
 
 async def seed_categories(session, dept_ids: dict[str, int]) -> int:
     added = 0
-    for name, dept, severity, sla in CATEGORIES:
+    for name, dept, severity in CATEGORIES:
         existing = (
             await session.execute(select(Category).where(Category.name == name))
         ).scalar_one_or_none()
@@ -99,7 +99,6 @@ async def seed_categories(session, dept_ids: dict[str, int]) -> int:
                 department_id=dept_ids[dept],
                 description=DESCRIPTIONS[name],
                 severity_weight=severity,
-                sla_hours=sla,
             )
         )
         added += 1

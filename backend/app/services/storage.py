@@ -47,13 +47,3 @@ def presign_get(object_key: str, expires: int = 3600) -> str:
 async def head(object_key: str) -> dict[str, Any]:
     """Verify an uploaded object exists; raises botocore ClientError if not."""
     return await asyncio.to_thread(_client.head_object, Bucket=settings.s3_bucket, Key=object_key)
-
-
-async def get_bytes(object_key: str) -> bytes:
-    """Download an object's bytes (used to feed photos to Gemini Vision)."""
-
-    def _read() -> bytes:
-        obj = _client.get_object(Bucket=settings.s3_bucket, Key=object_key)
-        return obj["Body"].read()
-
-    return await asyncio.to_thread(_read)
