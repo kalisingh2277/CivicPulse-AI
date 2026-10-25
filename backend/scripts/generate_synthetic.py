@@ -1,11 +1,11 @@
 """Generate a realistic ~14-month history of Bengaluru civic complaints so the
-dashboards and (Day 7) forecasting have real structure to show.
+dashboards have real structure to show.
 
 Model:
   - Poisson arrivals per ward x category x day at a low base rate.
   - Monsoon seasonality: Jun-Sep boosts waterlogging / water-supply categories.
-  - One injected HOTSPOT ward where potholes ramp up over the last ~10 weeks
-    (so emerging-hotspot detection and forecasting have a signal to find).
+  - One injected surge ward where potholes ramp up over recent weeks
+    (so the heatmap and trends have a visible signal).
   - Issues age realistically: older ones mostly resolved/closed (with resolution
     times), recent ones in progress.
 
@@ -39,10 +39,10 @@ BASE_LAMBDA = 0.012  # baseline issues per ward x category x day
 MONSOON_MONTHS = {6, 7, 8, 9}
 MONSOON_CATEGORIES = {"Waterlogging / flooding", "Water pipe leakage", "No water supply"}
 MONSOON_LAMBDA = 0.25  # water categories surge in monsoon (absolute daily rate)
-HOTSPOT_CATEGORY = "Pothole"
-HOTSPOT_SURGE_DAYS = 21  # the hotspot ward spikes over the last 3 weeks
+SURGE_CATEGORY = "Pothole"
+SURGE_SURGE_DAYS = 21  # the surge ward spikes over the last 3 weeks
 RESOLUTION_MAX_HOURS = 240  # resolved issues take 6h..10d (category-independent)
-HOTSPOT_LAMBDA = 0.8  # ~11 pothole reports in 14 days vs a near-zero baseline
+SURGE_LAMBDA = 0.8  # ~11 pothole reports in 14 days vs a near-zero baseline
 
 DESC = {
     "Pothole": "Pothole on the road causing problems for commuters",
@@ -86,15 +86,15 @@ async def _citizen_ids(db) -> list:
     return ids
 
 
-def _lambda(ward_id: int, cat_name: str, day: datetime, hotspot_ward: int, today) -> float:
+def _lambda(ward_id: int, cat_name: str, day: datetime, surge_ward: int, today) -> float:
     days_ago = (today - day.date()).days
     lam = BASE_LAMBDA
-    # Monsoon: water categories surge Jun–Sep (seasonality the forecast can show).
+    # Monsoon: water categories surge Jun–Sep (seasonality the trends chart can show).
     if day.month in MONSOON_MONTHS and cat_name in MONSOON_CATEGORIES:
         lam = MONSOON_LAMBDA
-    # Hotspot: one ward's potholes spike sharply in the last 3 weeks (emerging signal).
-    if ward_id == hotspot_ward and cat_name == HOTSPOT_CATEGORY and days_ago <= HOTSPOT_SURGE_DAYS:
-        lam = HOTSPOT_LAMBDA
+    # Surge: one ward's potholes spike sharply in the last 3 weeks (emerging signal).
+    if ward_id == surge_ward and cat_name == SURGE_CATEGORY and days_ago <= SURGE_SURGE_DAYS:
+        lam = SURGE_LAMBDA
     return lam
 
 
@@ -120,7 +120,7 @@ async def main() -> None:
             print("No wards/categories — run scripts.seed first.")
             return
 
-        hotspot_ward = wards[0]["id"]
+        surge_ward = wards[0]["id"]
         today = datetime.now(UTC).date()
         run = uuid4().hex[:6]
 
@@ -133,7 +133,7 @@ async def main() -> None:
             age_days = (today - day_dt.date()).days
             for w in wards:
                 for cat in cats:
-                    n = _poisson(_lambda(w["id"], cat.name, day_dt, hotspot_ward, today))
+                    n = _poisson(_lambda(w["id"], cat.name, day_dt, surge_ward, today))
                     for _ in range(n):
                         seq += 1
                         lng = w["lng"] + random.uniform(-0.004, 0.004)
@@ -191,7 +191,7 @@ async def main() -> None:
         print(f"inserted issues={len(issue_rows)} complaints={len(complaint_rows)}")
 
         total = await rebuild_daily_stats(db)
-        print(f"daily_stats rows: {total}  (hotspot ward id={hotspot_ward})")
+        print(f"daily_stats rows: {total}  (surge ward id={surge_ward})")
 
 
 _ISSUE_SQL = text(
