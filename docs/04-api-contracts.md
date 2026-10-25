@@ -32,11 +32,11 @@ Base URL: `/api/v1`. FastAPI auto-generates the live OpenAPI spec at `/docs` —
 | Method & path | Roles | Notes |
 |---|---|---|
 | POST `/complaints/similar-check` | C | sync; embeds text, runs dedup query; < 800 ms |
-| POST `/complaints` | C | creates complaint, enqueues pipeline, returns 201 immediately |
+| POST `/complaints` | C | creates complaint, schedules the pipeline as a background task, returns 201 immediately |
 | GET `/complaints/mine` | C | own complaints + effective issue status |
 | GET `/complaints/{id}` | C(own)/O/H/A | citizens see own only |
 | POST `/complaints/{id}/media/presign` | C(own) | `{mime, bytes}` → `{upload_url, object_key}`; ≤ 3 per complaint, ≤ 8 MB, image/* only |
-| POST `/complaints/{id}/media/confirm` | C(own) | after direct PUT; enqueues CV + moderation |
+| POST `/complaints/{id}/media/confirm` | C(own) | after direct PUT; marks the upload complete |
 
 **POST `/complaints` request/response:**
 ```json
@@ -72,13 +72,13 @@ Base URL: `/api/v1`. FastAPI auto-generates the live OpenAPI spec at `/docs` —
 ### Issues (the work unit)
 | Method & path | Roles | Notes |
 |---|---|---|
-| GET `/issues` | O/H/A | filters: `status, category_id, department_id, ward_id, bbox, priority_min, q, sla_breached`; sort: `priority`(default)`, created_at`; officials auto-scoped to their dept+wards |
+| GET `/issues` | O/H/A | filters: `status, category_id, department_id, ward_id, bbox, priority_min, q`; sort: `priority`(default)`, created_at`; officials auto-scoped to their dept+wards |
 | GET `/issues/{id}` | C(linked)/O/H/A | citizens get the public view (no internal notes/reporter PII of others) |
 | GET `/issues/{id}/timeline` | C(linked)/O/H/A | status history + public updates |
 | PATCH `/issues/{id}/status` | O/H/A | `{to_status, note}` — server validates the state machine (F5); resolve requires note |
 | POST `/issues/{id}/assign` | H/A | `{assignee_id}` |
 | POST `/issues/{id}/updates` | O/H/A | `{body, photo_key, is_internal}` |
-| POST `/issues/{id}/upvote` · DELETE | C | me-too + subscribe |
+| POST `/issues/{id}/upvote` · DELETE | C | me-too |
 | POST `/issues/{id}/confirm-resolution` | C(linked) | within 7-day window |
 | POST `/issues/{id}/reopen` | C(linked) | `{reason}`; once per citizen per issue |
 | POST `/issues/{id}/detach-complaint` | O/H/A | `{complaint_id}` → new issue; logs `corrections(detach)` |
@@ -96,23 +96,15 @@ Base URL: `/api/v1`. FastAPI auto-generates the live OpenAPI spec at `/docs` —
 |---|---|---|
 | GET `/analytics/heatmap` | O/H/A | `?bbox&category_id&from&to` → GeoJSON FeatureCollection of weighted grid cells |
 | GET `/analytics/trends` | O/H/A | `?ward_id&category_id&granularity=week` → series of new/resolved |
-| GET `/analytics/departments` | A | table: open, median resolution hrs, SLA breach %, reopened % |
-| GET `/analytics/hotspots` | O/H/A | clusters + `emerging: true/false` + the rate math |
-| GET `/analytics/forecast` | A | `?ward_id&category_id` → 4-week SARIMA forecast + CI, or `insufficient_history` |
-| GET `/analytics/wards/{id}/risk` | A | risk score + factor breakdown |
+| GET `/analytics/departments` | A | table: open, median resolution hrs, reopened % |
 
-### Reports, notifications, admin, public
+### Admin
 | Method & path | Roles | Notes |
 |---|---|---|
-| GET `/reports` · GET `/reports/{id}` | A/H | list + detail (md + pdf link) |
-| POST `/reports/generate` | A | on-demand, async; 202 + job id |
-| GET `/notifications` · POST `/notifications/read` | C/O/H/A | inbox + mark read |
 | CRUD `/admin/departments`, `/admin/categories` | A | category changes re-embed prototypes |
 | POST `/admin/wards/import` | A | GeoJSON FeatureCollection upload |
 | POST `/admin/users/invite` | A | email invite for officials: role, dept, wards, head flag |
 | GET `/admin/corrections` | A | the flywheel log (export as training data) |
-| GET `/public/stats` | P | city-wide counters, anonymized |
-| GET `/public/issues` | P | anonymized open/resolved issues for the transparency map (no reporter data, rounded locations) |
 
 ## Internal AI service contract
 
@@ -124,18 +116,14 @@ The `ai` service is **not exposed to the internet** (Docker network only).
 | POST `ai:8001/embed` | similar-check path | `{"texts": ["query: <text>", ...]}` → `{"vectors": [[...384 floats]], "model": "multilingual-e5-small"}` |
 | GET `ai:8001/health` | compose healthcheck | model loaded + versions |
 
-### Async jobs (Redis queue; payloads are the contract)
-| Job | Payload | Effect |
+### Background tasks (FastAPI `BackgroundTasks`, in the API process)
+| Task | Payload | Effect |
 |---|---|---|
-| `process_complaint` | `{complaint_id}` | full pipeline F8: language → embed → classify → dedupe → attach/create issue → score → notify |
-| `analyze_media` | `{media_id}` | CV detection + moderation → `complaint_media.cv_result` |
+| `process_complaint` | `{complaint_id}` | full pipeline F7: language → embed → classify → dedupe → attach/create issue → score |
 | `recompute_priority` | `{issue_id}` | after upvotes/attach/age tick |
 | `rebuild_daily_stats` | `{day}` | nightly aggregates |
-| `scan_sla` | `{}` | hourly breach scan + notifications |
-| `generate_report` | `{period_start, period_end, scope}` | stats → Gemini → md/pdf → email |
-| `send_notification` | `{notification_id}` | email fan-out |
 
-Rules: every job is **idempotent** (safe to re-run), retried 3× with backoff, then parked (`needs_manual_triage` for pipeline jobs) and logged in `ai_jobs`. Jobs carry IDs, never blobs — workers re-read current state from the DB.
+Rules: every task is **idempotent** (safe to re-run), parked on failure (`needs_manual_triage` for pipeline tasks) and logged in `ai_jobs`. Tasks carry IDs, never blobs — they re-read current state from the DB.
 
 ## Auth flow detail
 

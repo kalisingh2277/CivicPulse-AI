@@ -24,7 +24,5 @@ Read in this order. Each document builds on the previous one.
 | **Complaint** | One report from one citizen. Raw input. Never the unit of government work. |
 | **Issue** | The deduplicated, real-world problem (one pothole). Many complaints attach to one issue. The unit of all triage, assignment, and analytics. |
 | **Ward** | Smallest administrative area (polygon). Every issue belongs to exactly one ward. |
-| **SLA** | Hours a category allows for resolution before the issue is flagged as breached/escalated. |
 | **Triage** | Official reviews AI suggestions (category, duplicate-attachment, priority) and confirms or corrects them. Corrections become training data. |
-| **Hotspot** | Spatial cluster of open issues; *emerging* hotspot = cluster whose recent rate significantly exceeds its baseline. |
-| **AI pipeline** | The async job chain every new complaint passes through: embed → classify → CV → dedupe → score → notify. |
+| **AI pipeline** | The background-task chain every new complaint passes through: embed → classify → dedupe → score. |

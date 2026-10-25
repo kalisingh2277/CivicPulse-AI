@@ -26,7 +26,6 @@ erDiagram
     COMPLAINTS ||--o{ COMPLAINT_MEDIA : attaches
     COMPLAINTS ||--o{ AI_JOBS : processed-by
     COMPLAINTS ||--o{ CORRECTIONS : "official fixes (flywheel)"
-    USERS ||--o{ NOTIFICATIONS : receives
 ```
 
 ## DDL
@@ -42,11 +41,9 @@ CREATE EXTENSION IF NOT EXISTS citext;
 CREATE TYPE user_role             AS ENUM ('citizen','official','admin');
 CREATE TYPE processing_status     AS ENUM ('queued','processing','triaged','needs_manual_triage','rejected');
 CREATE TYPE issue_status          AS ENUM ('open','acknowledged','assigned','in_progress','resolved','closed','reopened','rejected');
-CREATE TYPE cv_status             AS ENUM ('pending','done','failed','skipped');
 CREATE TYPE moderation_status     AS ENUM ('pending','approved','flagged');
 CREATE TYPE correction_kind       AS ENUM ('recategorize','detach','merge','priority_override','reject');
 CREATE TYPE ai_job_status         AS ENUM ('queued','running','succeeded','failed');
-CREATE TYPE notification_channel  AS ENUM ('inapp','email');
 
 -- ---------- lookup / admin-managed ----------
 CREATE TABLE departments (
@@ -74,7 +71,6 @@ CREATE TABLE categories (
     description     text NOT NULL,             -- written for humans AND used to build the prototype embedding
     embedding       vector(384),               -- prototype embedding of description (zero-shot classification target)
     severity_weight smallint NOT NULL DEFAULT 3 CHECK (severity_weight BETWEEN 1 AND 5),
-    sla_hours       integer  NOT NULL DEFAULT 168,
     is_active       boolean  NOT NULL DEFAULT true
 );
 
@@ -126,12 +122,10 @@ CREATE TABLE issues (
     centroid        geography(Point, 4326) NOT NULL,         -- recomputed when complaints attach
     status          issue_status NOT NULL DEFAULT 'open',
     priority_score  real NOT NULL DEFAULT 0,                 -- 0..100
-    priority_factors jsonb,                                  -- {"severity":..,"volume":..,"age":..,"cv":..} transparency
+    priority_factors jsonb,                                  -- {"severity":..,"volume":..,"age":..} transparency
     complaint_count integer NOT NULL DEFAULT 0,
     upvote_count    integer NOT NULL DEFAULT 0,
     first_reported_at timestamptz NOT NULL,
-    sla_due_at      timestamptz NOT NULL,
-    sla_breached    boolean NOT NULL DEFAULT false,
     assigned_to     uuid REFERENCES users(id),
     resolved_at     timestamptz,
     resolution_note text,
@@ -183,8 +177,6 @@ CREATE TABLE complaint_media (
     width        integer,
     height       integer,
     exif_gps     geography(Point, 4326),                     -- kept internally for location verification; stripped on public serve
-    cv_status    cv_status NOT NULL DEFAULT 'pending',
-    cv_result    jsonb,                                      -- [{"label":"pothole","conf":0.91,"bbox":[x,y,w,h]}]
     moderation   moderation_status NOT NULL DEFAULT 'pending',
     created_at   timestamptz NOT NULL DEFAULT now()
 );
@@ -196,7 +188,7 @@ CREATE TABLE issue_status_history (
     issue_id    uuid NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
     from_status issue_status,
     to_status   issue_status NOT NULL,
-    actor_id    uuid REFERENCES users(id),                   -- NULL = system (auto-close, SLA job)
+    actor_id    uuid REFERENCES users(id),                   -- NULL = system (auto-close)
     note        text,
     created_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -229,15 +221,15 @@ CREATE TABLE corrections (                                   -- THE DATA FLYWHEE
     created_at   timestamptz NOT NULL DEFAULT now()
 );
 
--- ---------- ops, notifications, analytics ----------
+-- ---------- ops, analytics ----------
 CREATE TABLE ai_jobs (                                       -- telemetry for every pipeline step
     id           bigserial PRIMARY KEY,
-    job_type     text NOT NULL,                              -- embed|classify|cv|dedupe|score|title|report
+    job_type     text NOT NULL,                              -- embed|classify|dedupe|score|title
     complaint_id uuid REFERENCES complaints(id),
     media_id     uuid REFERENCES complaint_media(id),
     status       ai_job_status NOT NULL DEFAULT 'queued',
     attempts     smallint NOT NULL DEFAULT 0,
-    model        text,                                       -- "e5-small" | "gemini-2.x-flash" | "yolo11n-civic"
+    model        text,                                       -- "e5-small" | "gemini-2.x-flash"
     latency_ms   integer,
     confidence   real,
     error        text,
@@ -247,32 +239,7 @@ CREATE TABLE ai_jobs (                                       -- telemetry for ev
 );
 CREATE INDEX ai_jobs_complaint_idx ON ai_jobs (complaint_id);
 
-CREATE TABLE notifications (
-    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kind         text NOT NULL,                              -- status_change|sla_breach|resolution_confirm|report_ready
-    title        text NOT NULL,
-    body         text,
-    issue_id     uuid REFERENCES issues(id),
-    channel      notification_channel NOT NULL DEFAULT 'inapp',
-    read_at      timestamptz,
-    emailed_at   timestamptz,
-    created_at   timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX notifications_inbox_idx ON notifications (user_id, created_at DESC) WHERE read_at IS NULL;
-
-CREATE TABLE reports (
-    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    period_start date NOT NULL,
-    period_end   date NOT NULL,
-    scope        text NOT NULL DEFAULT 'city',               -- city | dept:<id> | ward:<id>
-    stats        jsonb NOT NULL,                             -- the numbers handed to the LLM (traceability)
-    content_md   text,
-    pdf_key      text,
-    created_at   timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE daily_stats (                                   -- precomputed; dashboards & forecasting read ONLY this
+CREATE TABLE daily_stats (                                   -- precomputed; dashboards read ONLY this
     day                  date NOT NULL,
     ward_id              smallint NOT NULL REFERENCES wards(id),
     category_id          smallint NOT NULL REFERENCES categories(id),
@@ -280,7 +247,6 @@ CREATE TABLE daily_stats (                                   -- precomputed; das
     new_issues           integer NOT NULL DEFAULT 0,
     resolved_issues      integer NOT NULL DEFAULT 0,
     reopened_issues      integer NOT NULL DEFAULT 0,
-    sla_breaches         integer NOT NULL DEFAULT 0,
     upvotes              integer NOT NULL DEFAULT 0,
     avg_resolution_hours real,
     PRIMARY KEY (day, ward_id, category_id)
@@ -327,25 +293,6 @@ FROM (
 ) t GROUP BY g;
 ```
 
-### 4. Spatial clustering for hotspots (no Python needed)
-
-```sql
-SELECT id, centroid,
-       ST_ClusterDBSCAN(centroid::geometry, eps := 0.003, minpoints := 5) OVER () AS cluster_id
-FROM issues
-WHERE status NOT IN ('closed','rejected');
-```
-
-### 5. SLA breach scan (hourly job)
-
-```sql
-UPDATE issues SET sla_breached = true
-WHERE sla_breached = false
-  AND status IN ('open','acknowledged','assigned','in_progress','reopened')
-  AND now() > sla_due_at
-RETURNING id, assigned_to, department_id;
-```
-
 ## Priority score v1 (transparent rules — stored in `priority_factors`)
 
 ```
@@ -353,7 +300,6 @@ priority = 100 * normalize(
     0.35 * severity_weight/5                          -- what kind of problem
   + 0.25 * log1p(complaint_count + upvote_count)/log1p(50)   -- how many people it affects
   + 0.20 * min(age_days/14, 1)                        -- how long it has waited
-  + 0.10 * cv_severity                                -- CV signal (e.g. pothole area ratio), 0 if none
   + 0.10 * sensitive_poi_proximity                    -- near school/hospital (later; 0 in MVP)
 )
 ```
@@ -362,23 +308,23 @@ Weights live in a config table/env so officials' feedback can tune them without 
 
 ## Seed categories (starter set)
 
-| Category | Department | severity_weight | sla_hours |
-|---|---|---|---|
-| Pothole | Roads | 4 | 72 |
-| Road cracking / damage | Roads | 3 | 168 |
-| Broken footpath | Roads | 2 | 240 |
-| Garbage dump / missed pickup | Sanitation | 3 | 48 |
-| Dead animal | Sanitation | 4 | 24 |
-| Public toilet unclean | Sanitation | 2 | 72 |
-| Water pipe leakage | Water | 4 | 24 |
-| Waterlogging / flooding | Water (Storm) | 5 | 24 |
-| No water supply | Water | 4 | 48 |
-| Streetlight not working | Electrical | 3 | 96 |
-| Dangling wires | Electrical | 5 | 24 |
-| Fallen tree / branches | Parks | 4 | 48 |
-| Park maintenance | Parks | 1 | 336 |
-| Illegal construction debris | Enforcement | 2 | 168 |
-| Stray animal menace | Health | 3 | 96 |
+| Category | Department | severity_weight |
+|---|---|---|
+| Pothole | Roads | 4 |
+| Road cracking / damage | Roads | 3 |
+| Broken footpath | Roads | 2 |
+| Garbage dump / missed pickup | Sanitation | 3 |
+| Dead animal | Sanitation | 4 |
+| Public toilet unclean | Sanitation | 2 |
+| Water pipe leakage | Water | 4 |
+| Waterlogging / flooding | Water (Storm) | 5 |
+| No water supply | Water | 4 |
+| Streetlight not working | Electrical | 3 |
+| Dangling wires | Electrical | 5 |
+| Fallen tree / branches | Parks | 4 |
+| Park maintenance | Parks | 1 |
+| Illegal construction debris | Enforcement | 2 |
+| Stray animal menace | Health | 3 |
 
 ## Operational notes
 
@@ -386,4 +332,4 @@ Weights live in a config table/env so officials' feedback can tune them without 
 - **Counters:** `complaint_count`/`upvote_count` are denormalized for queue sorting — update them in the same transaction as the insert (or a trigger), and add a nightly reconciliation job.
 - **Embedding model is pinned** (`intfloat/multilingual-e5-small`, 384-d). Changing models means re-embedding everything — record model name in `ai_jobs` so a migration is possible.
 - **Privacy/retention:** reporter identity never joins into public endpoints; EXIF GPS kept only in `complaint_media.exif_gps`; consider purging media N months after issue closure.
-- **`daily_stats`** is rebuilt incrementally each night (and backfilled by the seed script). Dashboards and SARIMA forecasts must read only this table.
+- **`daily_stats`** is rebuilt incrementally each night (and backfilled by the seed script). Dashboards must read only this table.

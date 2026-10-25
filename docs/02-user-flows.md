@@ -1,6 +1,6 @@
 # User Flows — CivicPulse AI
 
-Flows are numbered F1–F8. Mermaid renders on GitHub and in VS Code (Markdown Preview Mermaid extension).
+Flows are numbered F1–F7. Mermaid renders on GitHub and in VS Code (Markdown Preview Mermaid extension).
 
 ---
 
@@ -23,7 +23,7 @@ flowchart TD
 ```
 
 Notes:
-- Officials and admins never appear in this flow — they are invited (F7) and land on `/console`.
+- Officials and admins never appear in this flow — they are invited (F6) and land on `/console`.
 - Rate limit: 5 login attempts/min/IP. Generic "invalid credentials" error (no user enumeration).
 - Refresh token rotates on every use; reuse of a rotated token revokes the whole session family (standard rotation defense).
 
@@ -40,14 +40,13 @@ flowchart TD
     E --> F{Similar open issues nearby?}
     F -- Yes --> G[Show top 3 with photo, distance, status, reporter count]
     G --> H{It's the same problem?}
-    H -- Yes --> I[+1 Upvote issue
-subscribe to updates]
+    H -- Yes --> I[+1 Upvote issue]
     I --> J[Done - no new complaint created]
     H -- No --> K[POST /complaints]
     F -- No --> K
     K --> L[201 - complaint visible immediately, status: processing]
-    L --> M[Async AI pipeline runs - F8]
-    M --> N[Notification: categorized + linked, or needs manual triage]
+    L --> M[Async AI pipeline runs - F7]
+    M --> N[Complaint shows: categorized + linked, or needs manual triage]
 ```
 
 Design rules:
@@ -64,7 +63,7 @@ Design rules:
 flowchart TD
     A[My complaints list] --> B[Complaint detail: shows linked ISSUE status + public timeline]
     B --> C{Issue resolved by official}
-    C --> D[Notification: Was this fixed? - 7 day window]
+    C --> D[Prompt on complaint detail: Was this fixed? - 7 day window]
     D -- Confirm fixed --> E[Issue closed - thank you + stats]
     D -- Not fixed --> F[Issue reopened - flagged in official queue]
     D -- No response 7d --> G[Auto-close]
@@ -82,7 +81,7 @@ Notes:
 ```mermaid
 flowchart TD
     A[Console: triage queue - sorted by priority, filtered to my dept/wards] --> B[Open item]
-    B --> C[See: AI category + confidence, auto-attach decision, CV badges, similar issues]
+    B --> C[See: AI category + confidence, auto-attach decision, similar issues]
     C --> D{AI got it right?}
     D -- Yes --> E[One-click Confirm]
     D -- Wrong category --> F[Recategorize - logged as correction]
@@ -93,7 +92,7 @@ flowchart TD
     G --> I
     H --> I
     I --> J[Resolve with note + after-photo]
-    J --> K[Citizens notified - F3 confirm loop]
+    J --> K[Citizens see the update - F3 confirm loop]
 ```
 
 Notes:
@@ -125,50 +124,30 @@ Every transition writes `issue_status_history` (who, when, from, to, note). This
 
 ---
 
-## F6 — SLA escalation (system flow, no human trigger)
-
-```mermaid
-flowchart TD
-    A[Hourly cron job] --> B[Scan open issues: now > sla_due_at AND not breached]
-    B --> C[Mark sla_breached = true]
-    C --> D[Notify assignee + department head]
-    D --> E[Issue badge turns red in console + counts into dept breach %]
-    E --> F{Still unresolved 48h after breach?}
-    F -- Yes --> G[Escalation notification to admin]
-```
-
-SLA hours live on the category (e.g., water leak 24h, pothole 72h, faded signage 240h) and are admin-editable.
-
----
-
-## F7 — Admin: configuration & intelligence loop
+## F6 — Admin: configuration & intelligence loop
 
 ```mermaid
 flowchart TD
     subgraph Setup - once
       A[Import ward GeoJSON] --> B[Create departments]
-      B --> C[Define categories: dept, severity weight, SLA hours]
+      B --> C[Define categories: dept, severity weight]
       C --> D[Invite officials - email invite, role, dept, wards]
     end
     subgraph Weekly loop
-      E[City dashboard: heatmap, trends, dept performance] --> F[Drill into emerging hotspot]
-      F --> G[Read root-cause hypothesis - LLM over cluster stats]
-      G --> H[Reassign resources / direct dept head]
-      I[Monday 06:00: weekly AI report in inbox] --> E
+      E[City dashboard: heatmap, trends, dept performance] --> H[Reassign resources / direct dept head]
     end
     D --> E
 ```
 
 ---
 
-## F8 — AI pipeline (system sequence — the architectural spine)
+## F7 — AI pipeline (system sequence — the architectural spine)
 
 ```mermaid
 sequenceDiagram
     participant C as Citizen app
     participant API as FastAPI (api)
-    participant Q as Redis queue
-    participant W as ai-worker
+    participant W as Background task (in API process)
     participant AIS as ai-api (sync model server)
     participant DB as Postgres (PostGIS+pgvector)
     participant G as Gemini
@@ -182,16 +161,14 @@ sequenceDiagram
 
     C->>API: POST /complaints
     API->>DB: INSERT complaint (processing)
-    API->>Q: enqueue process_complaint(id)
     API-->>C: 201
+    API-)W: BackgroundTasks: run_pipeline(id)
 
-    W->>Q: dequeue
     W->>W: detect language, embed (local model)
     W->>W: categorize: embedding sim vs category prototypes
     alt confidence < 0.65
         W->>G: classify (Gemini Flash, structured output)
     end
-    W->>W: CV on photos (Gemini Vision zero-shot → later YOLO)
     W->>DB: dedupe query (vector + spatial + category, open issues)
     alt sim ≥ 0.88 and ≤ 150 m
         W->>DB: attach complaint to existing issue, bump counts
@@ -199,8 +176,7 @@ sequenceDiagram
         W->>DB: create new issue (title via Gemini, ward via ST_Contains)
     end
     W->>DB: compute priority score, write ai_jobs telemetry
-    W->>Q: enqueue notify(...)
-    Note over W,DB: every step idempotent + retried 3×, then needs_manual_triage
+    Note over W,DB: every step idempotent; on failure the complaint goes to needs_manual_triage
 ```
 
 Failure rule: **AI failure never loses a complaint.** Worst case, a complaint sits in `needs_manual_triage` and an official handles it like a legacy ticket.
